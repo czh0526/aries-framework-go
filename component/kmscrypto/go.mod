@@ -12,5 +12,4 @@ require golang.org/x/crypto v0.19.0 // indirect
 
 replace (
 	github.com/czh0526/aries-framework-go/spi => ../../spi
-	github.com/czh0526/aries-framework-go/component => ../../component
 )

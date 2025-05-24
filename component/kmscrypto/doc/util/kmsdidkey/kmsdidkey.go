@@ -4,7 +4,7 @@ import (
 	"crypto/elliptic"
 	"encoding/json"
 	"fmt"
-	"github.com/czh0526/aries-framework-go/compoment/kmscrypto/doc/util/fingerprint"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/fingerprint"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 )
