@@ -1,8 +1,19 @@
 package api
 
 import (
+	"errors"
 	"github.com/czh0526/aries-framework-go/component/models/did"
 	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
+)
+
+var ErrNotFound = errors.New("DID does not exist")
+
+const (
+	DIDCommServiceType = "did-communication"
+
+	DIDCommV2ServiceType = "DIDCommMessaging"
+
+	LegacyServiceType = "IndyAgent"
 )
 
 // Registry vdr registry.
