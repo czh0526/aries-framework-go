@@ -1,12 +1,18 @@
 package jwkkid
 
 import (
-	"encoding/json"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
-	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk/jwksupport"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	"github.com/czh0526/aries-framework-go/component/kmcrypto/util/cryptoutil"
+	"math/big"
 )
 
 func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
@@ -48,29 +54,91 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 	tp, err := j.Th
 }
 
-func unmarshalECDHKey(keyBytes []byte) (*spicrypto.PublicKey, error) {
-	compositeKey := &spicrypto.PublicKey{}
+func sha256Sum(j string) []byte {
+	h := crypto.SHA256.New()
+	_, _ = h.Write([]byte(j))
 
-	err := json.Unmarshal(keyBytes, compositeKey)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalECDHKey: failed to unmarshal ECDH Key: %v", err)
-	}
-
-	return compositeKey, nil
+	return h.Sum(nil)
 }
 
-func buildX25519JWK(keyBytes []byte) (string, error) {
-	const x25519ThumbprintTemplate = `{"crv": "X25519", "kty": "OKP", "x": "%s"}`
-
-	lenKey := len(keyBytes)
-	if lenKey > cryptoutil.
-}
-
-func createX25519KID(marshalledKey []byte) (string, error) {
-	compositeKey, err := unmarshalECDHKey(marshalledKey)
-	if err != nil {
-		return "", fmt.Errorf("createX25519KID: %v", err)
+func secp256k1Thumbprint(keyBytes []byte, kt spikms.KeyType) (string, error) {
+	switch kt {
+	case spikms.ECDSASecp256k1TypeIEEEP1363:
+	case spikms.ECDSASecp256k1TypeDER:
+	default:
+		return "", fmt.Errorf("secp256k1Thumbprint: invalid key type: %s", kt)
 	}
 
-	j, err := buildX25519JWK(compositeKey.X)
+	j, err := BuildJWK(keyBytes, kt)
+	if err != nil {
+		return "", fmt.Errorf("secp256k1Thumbprint: failed to build jwk: %v", err)
+	}
+
+	var input string
+	switch key := j.Key.(type) {
+	case *ecdsa.PublicKey:
+		input, err = secp256k1ThumbprintInput(key.Curve, key.X, key.Y)
+		if err != nil {
+			return "", fmt.Errorf("secp256k1Thumbprint: failed to get public key thumbprint input: %v", err)
+		}
+
+	case *ecdsa.PrivateKey:
+		input, err = secp256k1ThumbprintInput(key.Curve, key.X, key.Y)
+		if err != nil {
+			return "", fmt.Errorf("secp256k1Thumbprint: failed to get private key thumbprint input: %v", err)
+		}
+	default:
+		return "", fmt.Errorf("secp256k1Thumbprint: unknown key type: %T", key)
+	}
+
+	thumbprint := sha256Sum(input)
+
+	return base64.RawURLEncoding.EncodeToString(thumbprint), nil
+}
+
+func secp256k1ThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
+	ecSecp256K1ThumbprintTemplate := `{"crv":"SECP256K1","kty":"EC","x":"%s","y":"%s"}`
+	coordLength := curveSize(curve)
+
+	if len(x.Bytes()) > coordLength || len(y.Bytes()) > coordLength {
+		return "", errors.New("invalid elliptic secp256k1 key (too large)")
+	}
+}
+
+func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
+	var (
+		j   *jwk.JWK
+		err error
+	)
+
+	switch kt {
+	case spikms.ECDSAP256TypeDER, spikms.ECDSAP384TypeDER,
+		spikms.ECDSAP521TypeDER, spikms.ECDSASecp256k1DER:
+		j, err = generateJWKFromDERECDSA(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("buildJWK: faild to build JWK from ecdsa DER key: %v", err)
+		}
+
+	case spikms.ED25519Type:
+		j, err = jwksupport.JWKFromKey(ed25519.PublicKey(keyBytes))
+		if err != nil {
+			return nil, fmt.Errorf("buildJWK: faild to build JWK from key: %v", err)
+		}
+
+	case spikms.ECDSAP256TypeIEEEP1363, spikms.ECDSAP384IEEEP1363,
+		spikms.ECDSAP521TypeIEEEP1363, spikms.ECDSASecp256k1TypeIEEEP1363:
+
+	case spikms.NISTP256ECDHKWType, spikms.NISTP384ECDHKWType, spikms.NISTP521ECDHKWType:
+
+	case spikms.X25519ECDHKWType:
+	}
+}
+
+func generateJWKFromDERECDSA(keyBytes []byte) (*jwk.JWK, error) {
+	pubKey, err := x509.ParsePKIXPublicKey(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("generateJWKFromDERECDSA: failed to parse ecdsa key in DER format: %v", err)
+	}
+
+	return jwksupport.JWKFromKey(pubKey)
 }
