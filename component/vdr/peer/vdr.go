@@ -9,6 +9,10 @@ import (
 
 const (
 	StoreNamespace = "peer"
+
+	DefaultServiceType = "defaultServiceType"
+
+	DefaultServiceEndpoint = "defaultServiceEndpoint"
 )
 
 type VDR struct {

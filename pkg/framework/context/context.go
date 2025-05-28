@@ -3,6 +3,7 @@ package context
 import (
 	"fmt"
 	ldstore "github.com/czh0526/aries-framework-go/component/models/ld/store"
+	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
@@ -16,6 +17,8 @@ type Provider struct {
 	contextStore        ldstore.ContextStore
 	remoteProviderStore ldstore.RemoteProviderStore
 	documentLoader      jsonld.DocumentLoader
+	serviceEndpoint     string
+	vdr                 vdrapi.Registry
 }
 
 func (p *Provider) StorageProvider() spistorage.Provider {
@@ -83,6 +86,20 @@ func WithJSONLDRemoteProviderStore(store ldstore.RemoteProviderStore) ProviderOp
 func WithJSONLDDocumentLoader(loader jsonld.DocumentLoader) ProviderOption {
 	return func(p *Provider) error {
 		p.documentLoader = loader
+		return nil
+	}
+}
+
+func WithVDRegistry(vdr vdrapi.Registry) ProviderOption {
+	return func(p *Provider) error {
+		p.vdr = vdr
+		return nil
+	}
+}
+
+func WithServiceEndpoint(endpoint string) ProviderOption {
+	return func(p *Provider) error {
+		p.serviceEndpoint = endpoint
 		return nil
 	}
 }

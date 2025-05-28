@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/fingerprint"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 )
@@ -43,7 +44,12 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
 		}
 
-		xKID, err = jwkkid.C
+		xKID, err = jwkkid.CreateKID(mPubXKey, kmtKT)
+		if err != nil {
+			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
+		}
+
+		pubXKey.KID = xKID
 
 	case fingerprint.P256PubKeyMultiCodec:
 		kmtKT = spikms.ECDSAP256TypeIEEEP1363

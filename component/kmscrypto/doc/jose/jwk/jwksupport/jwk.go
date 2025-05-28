@@ -6,6 +6,14 @@ import (
 	"github.com/go-jose/go-jose/v3"
 )
 
+const (
+	ecKty          = "EC"
+	okpKty         = "OKP"
+	x25519Crv      = "X25519"
+	bls12381G2Crv  = "BLS12381_G2"
+	bls12381G2Size = 96
+)
+
 func JWKFromKey(opaqueKey interface{}) (*jwk.JWK, error) {
 	key := &jwk.JWK{
 		JSONWebKey: jose.JSONWebKey{

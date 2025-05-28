@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmsdidkey"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
@@ -127,6 +128,10 @@ func (p *Packager) prepareSendAndRecipientKeys(cty string, envelope *transport.E
 	switch {
 	case strings.HasPrefix(string(envelope.FromKey), "did:key"):
 		senderKey, err := kmsdidkey.EncryptionPubKeyFromDIDKey(string(envelope.FromKey))
+		if err != nil {
+			return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: failed to extract pubKeyBytess from senderVerKey: %s", err)
+		}
+
 	case strings.Index(string(envelope.FromKey), "#") > 0:
 	default
 	}

@@ -51,7 +51,12 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 		return "", fmt.Errorf("createKID: failed to build jwk: %v", err)
 	}
 
-	tp, err := j.Th
+	tp, err := j.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return "", fmt.Errorf("createKID: failed to get jwk thumbprint: %v", err)
+	}
+
+	return base64.RawURLEncoding.EncodeToString(tp), nil
 }
 
 func sha256Sum(j string) []byte {
@@ -98,11 +103,15 @@ func secp256k1Thumbprint(keyBytes []byte, kt spikms.KeyType) (string, error) {
 
 func secp256k1ThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
 	ecSecp256K1ThumbprintTemplate := `{"crv":"SECP256K1","kty":"EC","x":"%s","y":"%s"}`
-	coordLength := curveSize(curve)
+	coordLength := jwk.CurveSize(curve)
 
 	if len(x.Bytes()) > coordLength || len(y.Bytes()) > coordLength {
 		return "", errors.New("invalid elliptic secp256k1 key (too large)")
 	}
+
+	return fmt.Sprintf(ecSecp256K1ThumbprintTemplate,
+		jwk.NewFixedSizeBuffer(x.Bytes(), coordLength).Base64(),
+		jwk.NewFixedSizeBuffer(y.Bytes(), coordLength).Base64()), nil
 }
 
 func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
@@ -127,6 +136,19 @@ func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 
 	case spikms.ECDSAP256TypeIEEEP1363, spikms.ECDSAP384IEEEP1363,
 		spikms.ECDSAP521TypeIEEEP1363, spikms.ECDSASecp256k1TypeIEEEP1363:
+		c := getCurveByKMSKeyType(kt)
+		x, y := elliptic.Unmarshal(c, keyBytes)
+
+		pubKey := &ecdsa.PublicKey{
+			Curve: c,
+			X:     x,
+			Y:     y,
+		}
+
+		j, err = jwksupport.JWKFromKey(pubKey)
+		if err != nil {
+			return nil, fmt.Errorf("buildJWK: failed to build JKW from ecdsa key in IEEE1363 format: %v", err)
+		}
 
 	case spikms.NISTP256ECDHKWType, spikms.NISTP384ECDHKWType, spikms.NISTP521ECDHKWType:
 

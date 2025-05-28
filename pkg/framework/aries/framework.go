@@ -10,6 +10,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/vdr/peer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packager"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -19,6 +20,7 @@ import (
 )
 
 const (
+	defaultEndpoint     = "didcomm:transport/queue"
 	defaultMasterKeyURI = "local-lock://default/master/key/"
 )
 
@@ -36,6 +38,7 @@ type Aries struct {
 	packerCreator       packer.Creator
 	packerCreators      []packer.Creator
 	packagerCreator     packager.Creator
+	mediaTypeProfiles   []string
 }
 
 type Option func(opts *Aries) error
@@ -124,6 +127,7 @@ func createVDR(aries *Aries) error {
 		context.WithKMS(aries.kms),
 		context.WithCrypto(aries.crypto),
 		context.WithStorageProvider(aries.storeProvider),
+		context.WithServiceEndpoint(serviceEndpoint(aries)),
 	)
 	if err != nil {
 		return fmt.Errorf("create context failed: %v", err)
@@ -134,19 +138,32 @@ func createVDR(aries *Aries) error {
 		vdrOpts = append(vdrOpts, vdr.WithVDR(v))
 	}
 
+	// 将 did:peer:xxxxx 注册进 VDRegistry
 	p, err := peer.New(ctx.StorageProvider())
 	if err != nil {
 		return fmt.Errorf("create new vdr peer failed: %v", err)
 	}
 
+	dst := vdrapi.DIDCommServiceType
+	for _, mediaType := range aries.mediaTypeProfiles {
+		if mediaType == transport.MediaTypeDIDCommV2Profile ||
+			mediaType == transport.MediaTypeAIP2RFC0587Profile {
+			dst = vdrapi.DIDCommV2ServiceType
+			break
+		}
+	}
+
 	vdrOpts = append(vdrOpts,
 		vdr.WithVDR(p),
+		vdr.WithDefaultServiceType(dst),
+		vdr.WithDefaultServiceEndpoint(serviceEndpoint(aries)),
 	)
 
+	// 将 did:key:xxxxx 注册进 VDRegistry
 	k := key.New()
 	vdrOpts = append(vdrOpts, vdr.WithVDR(k))
-
 	aries.vdrRegistry = vdr.New(vdrOpts...)
+
 	return nil
 }
 
@@ -198,6 +215,14 @@ func createJSONLDDocumentLoader(aries *Aries) error {
 
 	aries.documentLoader = documentLoader
 	return nil
+}
+
+func serviceEndpoint(aries *Aries) string {
+	return fetchEndpoint(aries, "ws")
+}
+
+func fetchEndpoint(aries *Aries, defaultScheme string) string {
+	return defaultEndpoint
 }
 
 func createPackersAndPackager(aries *Aries) error {
