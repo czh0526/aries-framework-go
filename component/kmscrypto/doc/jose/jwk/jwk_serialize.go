@@ -108,6 +108,7 @@ func marshalSecp256k1(jwk *JWK) ([]byte, error) {
 			Kty: ecKty,
 			Crv: secp256k1Crv,
 			X:   NewFixedSizeBuffer(ecdsaKey.X.Bytes(), secp256k1Size),
+			Y:   NewFixedSizeBuffer(ecdsaKey.Y.Bytes(), secp256k1Size),
 		}
 	case *ecdsa.PrivateKey:
 		raw = jsonWebKey{

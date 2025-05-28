@@ -39,7 +39,7 @@ func (b *ByteBuffer) Base64() string {
 }
 
 func (b *ByteBuffer) bigInt() *big.Int {
-	return new(big.Int)
+	return new(big.Int).SetBytes(b.data)
 }
 
 func NewBuffer(data []byte) *ByteBuffer {

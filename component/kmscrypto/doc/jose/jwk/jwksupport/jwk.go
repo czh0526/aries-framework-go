@@ -34,3 +34,25 @@ func JWKFromKey(opaqueKey interface{}) (*jwk.JWK, error) {
 
 	return key, nil
 }
+
+func JWKFromX25519Key(pubKey []byte) (*jwk.JWK, error) {
+	key := &jwk.JWK{
+		JSONWebKey: jose.JSONWebKey{
+			Key: pubKey,
+		},
+		Crv: x25519Crv,
+		Kty: okpKty,
+	}
+
+	keyBytes, err := key.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("create JWK failed: err = %v", err)
+	}
+
+	err = key.UnmarshalJSON(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("create JWK failed, err = %v", err)
+	}
+
+	return key, nil
+}
