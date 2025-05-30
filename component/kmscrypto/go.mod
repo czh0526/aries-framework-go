@@ -8,6 +8,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/czh0526/aries-framework-go/spi v0.0.0-00010101000000-000000000000
 	github.com/go-jose/go-jose/v3 v3.0.4
+	github.com/google/tink/go v1.7.0
 	github.com/stretchr/testify v1.8.0
 )
 
@@ -21,6 +22,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

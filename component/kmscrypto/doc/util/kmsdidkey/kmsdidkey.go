@@ -8,8 +8,10 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
+	commonpb "github.com/google/tink/go/proto/common_go_proto"
 )
 
+// EncryptionPubKeyFromDIDKey 根据 did keyId 获取公钥
 func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 	pubKey, code, err := extractRawKey(didKey)
 	if err != nil {
@@ -69,6 +71,19 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 	default:
 		return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: unsupported key multicodec code [0x%x]", code)
 	}
+
+	kid, err := jwkkid.CreateKID(pubKey, kmtKT)
+	if err != nil {
+		return nil, fmt.Errorf("encryptionPubKeyFromDIDKey failed: err = %v", err)
+	}
+
+	return &spicrypto.PublicKey{
+		KID:   kid,
+		X:     x,
+		Y:     y,
+		Curve: crv,
+		Type:  kt,
+	}, nil
 }
 
 func extractRawKey(didKey string) ([]byte, uint64, error) {
@@ -83,4 +98,34 @@ func extractRawKey(didKey string) ([]byte, uint64, error) {
 	}
 
 	return pubKey, code, nil
+}
+
+func unmarshalECKey(ecCRV elliptic.Curve, pubKey []byte) (string, []byte, []byte, []byte) {
+	var (
+		x []byte
+		y []byte
+	)
+
+	ecCurves := map[elliptic.Curve]string{
+		elliptic.P256(): commonpb.EllipticCurveType_NIST_P256.String(),
+		elliptic.P384(): commonpb.EllipticCurveType_NIST_P384.String(),
+		elliptic.P521(): commonpb.EllipticCurveType_NIST_P521.String(),
+	}
+
+	xBig, yBig := elliptic.UnmarshalCompressed(ecCRV, pubKey)
+	if xBig != nil && yBig != nil {
+		x = xBig.Bytes()
+		y = yBig.Bytes()
+
+		pubKey = elliptic.Marshal(ecCRV, xBig, yBig)
+	} else {
+		// 4 => 标志位，表明是未压缩的公钥坐标
+		pubKey = append([]byte{4}, pubKey...)
+		xBig, yBig = elliptic.Unmarshal(ecCRV, pubKey)
+
+		x = xBig.Bytes()
+		y = yBig.Bytes()
+	}
+
+	return ecCurves[ecCRV], x, y, pubKey
 }

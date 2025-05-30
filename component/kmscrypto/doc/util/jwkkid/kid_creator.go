@@ -9,12 +9,17 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk/jwksupport"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
+	hybrid "github.com/google/tink/go/hybrid/subtle"
 	"math/big"
 )
 
+var errInvalidKeyType = errors.New("key type is not supported")
+
+// CreateKID 创建一个 KID
 func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 	if len(keyBytes) == 0 {
 		return "", errors.New("createKID: empty key")
@@ -66,54 +71,7 @@ func sha256Sum(j string) []byte {
 	return h.Sum(nil)
 }
 
-func secp256k1Thumbprint(keyBytes []byte, kt spikms.KeyType) (string, error) {
-	switch kt {
-	case spikms.ECDSASecp256k1TypeIEEEP1363:
-	case spikms.ECDSASecp256k1TypeDER:
-	default:
-		return "", fmt.Errorf("secp256k1Thumbprint: invalid key type: %s", kt)
-	}
-
-	j, err := BuildJWK(keyBytes, kt)
-	if err != nil {
-		return "", fmt.Errorf("secp256k1Thumbprint: failed to build jwk: %v", err)
-	}
-
-	var input string
-	switch key := j.Key.(type) {
-	case *ecdsa.PublicKey:
-		input, err = secp256k1ThumbprintInput(key.Curve, key.X, key.Y)
-		if err != nil {
-			return "", fmt.Errorf("secp256k1Thumbprint: failed to get public key thumbprint input: %v", err)
-		}
-
-	case *ecdsa.PrivateKey:
-		input, err = secp256k1ThumbprintInput(key.Curve, key.X, key.Y)
-		if err != nil {
-			return "", fmt.Errorf("secp256k1Thumbprint: failed to get private key thumbprint input: %v", err)
-		}
-	default:
-		return "", fmt.Errorf("secp256k1Thumbprint: unknown key type: %T", key)
-	}
-
-	thumbprint := sha256Sum(input)
-
-	return base64.RawURLEncoding.EncodeToString(thumbprint), nil
-}
-
-func secp256k1ThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
-	ecSecp256K1ThumbprintTemplate := `{"crv":"SECP256K1","kty":"EC","x":"%s","y":"%s"}`
-	coordLength := jwk.CurveSize(curve)
-
-	if len(x.Bytes()) > coordLength || len(y.Bytes()) > coordLength {
-		return "", errors.New("invalid elliptic secp256k1 key (too large)")
-	}
-
-	return fmt.Sprintf(ecSecp256K1ThumbprintTemplate,
-		jwk.NewFixedSizeBuffer(x.Bytes(), coordLength).Base64(),
-		jwk.NewFixedSizeBuffer(y.Bytes(), coordLength).Base64()), nil
-}
-
+// BuildJWK 构建 JWK 对象
 func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 	var (
 		j   *jwk.JWK
@@ -151,9 +109,26 @@ func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 		}
 
 	case spikms.NISTP256ECDHKWType, spikms.NISTP384ECDHKWType, spikms.NISTP521ECDHKWType:
+		j, err = generateJWKFromECDH(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("buildJWK: failed to build JWK from ecdh key, err = %v", err)
+		}
 
 	case spikms.X25519ECDHKWType:
+		pubKey, err := unmarshalECDHKey(keyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("buildJWK: failed to unmarshal public key from X25519 key, err = %v", err)
+		}
+
+		j, err = jwksupport.JWKFromX25519Key(pubKey.X)
+		if err != nil {
+			return nil, fmt.Errorf("buildJWK: failed to build JWK from X25519 key, err = %v", err)
+		}
+	default:
+		return nil, fmt.Errorf("buildJWK: %w: `%s`", errInvalidKeyType, kt)
 	}
+
+	return j, nil
 }
 
 func generateJWKFromDERECDSA(keyBytes []byte) (*jwk.JWK, error) {
@@ -163,4 +138,42 @@ func generateJWKFromDERECDSA(keyBytes []byte) (*jwk.JWK, error) {
 	}
 
 	return jwksupport.JWKFromKey(pubKey)
+}
+
+func generateJWKFromECDH(keyBytes []byte) (*jwk.JWK, error) {
+	compositeKey, err := unmarshalECDHKey(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("generateJWKFromECDH: unmarshalECDHKey failed, err = %v", err)
+	}
+
+	c, err := hybrid.GetCurve(compositeKey.Curve)
+	if err != nil {
+		return nil, fmt.Errorf("generateJWKFromECDH: get Curve for ECDH key failed, err = %v", err)
+	}
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: c,
+		X:     new(big.Int).SetBytes(compositeKey.X),
+		Y:     new(big.Int).SetBytes(compositeKey.Y),
+	}
+
+	return jwksupport.JWKFromKey(pubKey)
+}
+
+func getCurveByKMSKeyType(kt spikms.KeyType) elliptic.Curve {
+	switch kt {
+	case spikms.ECDSAP256TypeIEEEP1363:
+		return elliptic.P256()
+
+	case spikms.ECDSAP384TypeIEEEP1363:
+		return elliptic.P384()
+
+	case spikms.ECDSAP521TypeIEEEP1363:
+		return elliptic.P521()
+
+	case spikms.ECDSASecp256k1TypeIEEEP1363:
+		return btcec.S256()
+	}
+
+	return elliptic.P256()
 }

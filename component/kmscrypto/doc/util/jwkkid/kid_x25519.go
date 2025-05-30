@@ -9,6 +9,7 @@ import (
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 )
 
+// createX25519KID 为 X25519 创建一个 KID
 func createX25519KID(marshalledKey []byte) (string, error) {
 	compositeKey, err := unmarshalECDHKey(marshalledKey)
 	if err != nil {
@@ -25,6 +26,7 @@ func createX25519KID(marshalledKey []byte) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(thumbprint), nil
 }
 
+// buildX25519JWK 创建一个 json 格式的 JWK
 func buildX25519JWK(keyBytes []byte) (string, error) {
 	const x25519ThumbprintTemplate = `{"crv": "X25519", "kty": "OKP", "x": "%s"}`
 
@@ -41,6 +43,7 @@ func buildX25519JWK(keyBytes []byte) (string, error) {
 	return j, nil
 }
 
+// unmarshalECDHKey 从 json 格式的 JWK 中抽取 PublicKey 对象
 func unmarshalECDHKey(keyBytes []byte) (*spicrypto.PublicKey, error) {
 	compositeKey := &spicrypto.PublicKey{}
 
