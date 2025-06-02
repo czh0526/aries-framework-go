@@ -29,7 +29,7 @@ func (j *JWK) UnmarshalJSON(jwkBytes []byte) error {
 
 	marshalErr := json.Unmarshal(jwkBytes, &key)
 	if marshalErr != nil {
-		return fmt.Errorf("unable to read JWKL %v", marshalErr)
+		return fmt.Errorf("unable to read JWK: %v", marshalErr)
 	}
 
 	if isSecp256k1(key.Alg, key.Kty, key.Crv) {
@@ -57,8 +57,8 @@ func (j *JWK) UnmarshalJSON(jwkBytes []byte) error {
 		*j = *jwk
 
 	} else {
+		// NIST P-256,P-384,P-521 系列
 		var joseJWK jose.JSONWebKey
-
 		err := json.Unmarshal(jwkBytes, &joseJWK)
 		if err != nil {
 			return fmt.Errorf("unable to read jose JWK, %v", err)

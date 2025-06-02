@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/primitive/bbs12381g2pub"
+	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/go-jose/go-jose/v3"
 	"strings"
 )
@@ -98,6 +99,47 @@ func (j *JWK) isSecp256k1() bool {
 		isSecp256k1(j.Algorithm, j.Kty, j.Crv)
 }
 
+func (j *JWK) KeyType() (spikms.KeyType, error) {
+	switch key := j.Key.(type) {
+	case ed25519.PrivateKey, ed25519.PublicKey:
+		return spikms.ED25519Type, nil
+	case *bbs12381g2pub.PublicKey, *bbs12381g2pub.PrivateKey:
+		return spikms.BLS12381G2Type, nil
+	case *ecdsa.PublicKey:
+		return ecdsaPubKeyType(key)
+	case *ecdsa.PrivateKey:
+		return ecdsaPubKeyType(&(key.PublicKey))
+	case *rsa.PublicKey, *rsa.PrivateKey:
+		return spikms.RSAPS256Type, nil
+	}
+
+	switch {
+	case isX25519(j.Kty, j.Crv):
+		return spikms.X25519ECDHKWType, nil
+	case isEd25519(j.Kty, j.Crv):
+		return spikms.ED25519Type, nil
+	case isSecp256k1(j.Algorithm, j.Kty, j.Crv):
+		return spikms.ECDSASecp256k1TypeIEEEP1363, nil
+	default:
+		return "", fmt.Errorf("no keytype recognized for jwk")
+	}
+}
+
+func ecdsaPubKeyType(pub *ecdsa.PublicKey) (spikms.KeyType, error) {
+	switch pub.Curve {
+	case btcec.S256():
+		return spikms.ECDSASecp256k1TypeIEEEP1363, nil
+	case elliptic.P256():
+		return spikms.ECDSAP256TypeIEEEP1363, nil
+	case elliptic.P384():
+		return spikms.ECDSAP384TypeIEEEP1363, nil
+	case elliptic.P521():
+		return spikms.ECDSAP521TypeIEEEP1363, nil
+	}
+
+	return "", fmt.Errorf("no keytype recognized for ecdsa jwk")
+}
+
 func isSecp256k1Key(pubKey interface{}) bool {
 	switch key := pubKey.(type) {
 	case *ecdsa.PublicKey:
@@ -116,6 +158,10 @@ func isSecp256k1(alg, kty, crv string) bool {
 
 func isX25519(kty, crv string) bool {
 	return strings.EqualFold(kty, okpKty) && strings.EqualFold(crv, x25519Crv)
+}
+
+func isEd25519(kty, crv string) bool {
+	return strings.EqualFold(kty, okpKty) && strings.EqualFold(crv, ed25519Crv)
 }
 
 func isBLS12381G2(kty, crv string) bool {

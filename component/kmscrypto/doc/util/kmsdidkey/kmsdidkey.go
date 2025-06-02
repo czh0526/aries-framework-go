@@ -11,7 +11,11 @@ import (
 	commonpb "github.com/google/tink/go/proto/common_go_proto"
 )
 
-// EncryptionPubKeyFromDIDKey 根据 did keyId 获取公钥
+// EncryptionPubKeyFromDIDKey 根据 did keyId 计算出公钥对象，包括：
+// 1）椭圆曲线类型
+// 2）公钥点X坐标
+// 3）公钥点Y坐标
+// 4) 公钥类型
 func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 	pubKey, code, err := extractRawKey(didKey)
 	if err != nil {
@@ -28,6 +32,23 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 
 	switch code {
 	case fingerprint.ED25519PubKeyMultiCodec:
+		var edKID string
+
+		kmtKT = spikms.ED25519Type
+		pubEDKey := &spicrypto.PublicKey{
+			X:     pubKey,
+			Curve: "Ed25519",
+			Type:  "OKP",
+		}
+
+		edKID, err = jwkkid.CreateKID(pubKey, kmtKT)
+		if err != nil {
+			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
+		}
+
+		pubEDKey.KID = edKID
+		return pubEDKey, nil
+
 	case fingerprint.X25519PubKeyMultiCodec:
 		var (
 			mPubXKey []byte
@@ -52,6 +73,7 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 		}
 
 		pubXKey.KID = xKID
+		return pubXKey, nil
 
 	case fingerprint.P256PubKeyMultiCodec:
 		kmtKT = spikms.ECDSAP256TypeIEEEP1363
