@@ -2,6 +2,8 @@ package packager
 
 import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmsdidkey"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
@@ -78,7 +80,20 @@ func newDIDsAndDIDDocResolverFunc(customKMS spikms.KeyManager, keyType spikms.Ke
 	t.Helper()
 
 	_, fromKey, err := customKMS.CreateAndExportPubKeyBytes(keyType)
+	require.NoError(t, err)
 
+	fromDIDKey, err := kmsdidkey.BuildDIDKeyByKeyType(fromKey, keyType)
+	require.NoError(t, err)
+
+	fromJWK, err := jwkkid.BuildJWK(fromKey, keyType)
+	require.NoError(t, err)
+
+	vmKeyType := "JsonWebKey2020"
+	if keyType == spikms.X25519ECDHKWType {
+		vmKeyType = "X25519KeyAgreementKey2019"
+	}
+
+	fromDID := mockdiddoc.
 }
 
 func newMockKMSProvider(provider *mockstorage.MockStoreProvider, t *testing.T) spikms.Provider {
