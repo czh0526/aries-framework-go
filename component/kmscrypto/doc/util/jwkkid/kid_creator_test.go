@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
 	"github.com/btcsuite/btcd/btcec"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
@@ -44,6 +45,46 @@ func Test_CreateKID(t *testing.T) {
 		require.NoError(t, err)
 
 		kid, err = CreateKID(mX25519Key, spikms.X25519ECDHKWType)
+		require.NoError(t, err)
+		require.NotEmpty(t, kid)
+	})
+
+	t.Run("test P-256 DER format KID", func(t *testing.T) {
+		var kid string
+
+		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+
+		pubECKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+		require.NoError(t, err)
+
+		kid, err = CreateKID(pubECKeyBytes, spikms.ECDSAP256DER)
+		require.NoError(t, err)
+		require.NotEmpty(t, kid)
+	})
+
+	t.Run("test P-256 IEEE-P1363 format KID", func(t *testing.T) {
+		var kid string
+
+		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+
+		pubECKeyBytes := elliptic.Marshal(privateKey.Curve, privateKey.X, privateKey.Y)
+		require.NoError(t, err)
+
+		kid, err = CreateKID(pubECKeyBytes, spikms.ECDSAP256TypeIEEEP1363)
+		require.NoError(t, err)
+		require.NotEmpty(t, kid)
+	})
+
+	t.Run("test secp256k1 DER format KID", func(t *testing.T) {
+		var kid string
+
+		secp256k1Key, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
+		require.NoError(t, err)
+
+		pubECKeyBytes := elliptic.Marshal(secp256k1Key.Curve, secp256k1Key.X, secp256k1Key.Y)
+		kid, err = CreateKID(pubECKeyBytes, spikms.ECDSASecp256k1TypeIEEEP1363)
 		require.NoError(t, err)
 		require.NotEmpty(t, kid)
 	})

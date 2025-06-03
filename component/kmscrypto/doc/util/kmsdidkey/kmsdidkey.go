@@ -108,6 +108,7 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 	}, nil
 }
 
+// extractRawKey 将 keyID 分解成 codec + public key
 func extractRawKey(didKey string) ([]byte, uint64, error) {
 	idMethodSpecificID, err := fingerprint.MethodIDFromDIDKey(didKey)
 	if err != nil {

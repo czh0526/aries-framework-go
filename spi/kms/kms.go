@@ -4,6 +4,17 @@ type KeyManager interface {
 }
 
 type Store interface {
+	Create(kt KeyType, opts ...KeyOpts) (string, interface{}, error)
+
+	Get(keyID string) (interface{}, error)
+
+	ExportPubKeyBytes(keyID string) ([]byte, KeyType, error)
+
+	CreateAndExportPubKeyBytes(kt KeyType, opts ...KeyOpts) (string, []byte, error)
+
+	PubKeyBytesToHandle(pubKey []byte, kt KeyType, opts ...KeyOpts) (interface{}, error)
+
+	ImportPrivateKey(privKey interface{}, kt KeyType, opts ...PrivateKeyOpts) (string, interface{}, error)
 }
 
 type Provider interface {

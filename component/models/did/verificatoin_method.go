@@ -14,3 +14,7 @@ type VerificationMethod struct {
 	relativeURL       bool
 	multibaseEncoding multibase.Encoding
 }
+
+func (vm *VerificationMethod) JSONWebKey() *jwk.JWK {
+	return vm.jsonWebKey
+}
