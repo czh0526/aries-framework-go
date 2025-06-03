@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package google.crypto.tink;
+import "proto/common.proto";
+import "proto/tink.proto";
+
+option go_package = "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto";
+
+
+enum KeyType {
+  UNKNOWN_KEY_TYPE = 0;
+  EC = 1;
+  OKP = 2;
+}
+
+message EcdhKwParams {
+  EllipticCurveType curve_type = 1;
+  KeyType key_type = 2;
+}
+
+message EcdhAeadEncParams {
+  KeyTemplate aead_enc = 1;
+  bytes CEK = 2;
+}
+
+message EcdhAeadParams {
+  EcdhKwParams kw_params = 1;
+  EcdhAeadEncParams enc_params = 2;
+  EcPointFormat ec_point_format = 3;
+}
+
+message EcdhAeadPublicKey {
+  uint32 version = 1;
+  EcdhAeadParams params = 2;
+  string KID = 3;
+  bytes x = 4;
+  bytes y = 5;
+}
+
+message EcdhAeadPrivateKey {
+  uint32 version = 1;
+  EcdhAeadPublicKey public_key = 2;
+  bytes key_value = 3;
+}
+
+message EcdhAeadKeyFormat {
+  EcdhAeadParams params = 1;
+}

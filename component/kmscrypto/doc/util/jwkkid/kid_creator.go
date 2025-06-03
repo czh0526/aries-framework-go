@@ -27,6 +27,7 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 
 	switch kt {
 	case spikms.X25519ECDHKWType:
+		// 反序列化 JSON 对象
 		x25519KID, err := createX25519KID(keyBytes)
 		if err != nil {
 			return "", fmt.Errorf("createKID: %v", err)
@@ -51,6 +52,7 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 		return secp256k1KID, nil
 	}
 
+	// 从字节数组中提取公钥
 	j, err := BuildJWK(keyBytes, kt)
 	if err != nil {
 		return "", fmt.Errorf("createKID: failed to build jwk: %v", err)
@@ -105,7 +107,7 @@ func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 
 		j, err = jwksupport.JWKFromKey(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: failed to build JKW from ecdsa key in IEEE1363 format: %v", err)
+			return nil, fmt.Errorf("buildJWK: failed to build JWK from ecdsa key in IEEE1363 format: %v", err)
 		}
 
 	case spikms.NISTP256ECDHKWType, spikms.NISTP384ECDHKWType, spikms.NISTP521ECDHKWType:
