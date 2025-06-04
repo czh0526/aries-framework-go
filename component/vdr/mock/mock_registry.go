@@ -64,6 +64,14 @@ func (m *VDRegistry) Update(didDoc *did.Doc, opts ...spivdr.DIDMethodOption) err
 	return nil
 }
 
+func (m *VDRegistry) Deactivate(didID string, opts ...spivdr.DIDMethodOption) error {
+	if m.DeactivateFunc != nil {
+		return m.DeactivateFunc(didID, opts...)
+	}
+
+	return nil
+}
+
 func (m *VDRegistry) Close() error {
 	return nil
 }

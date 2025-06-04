@@ -4,12 +4,66 @@ import (
 	"crypto/elliptic"
 	"encoding/json"
 	"fmt"
+	comp_crypto "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/fingerprint"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	commonpb "github.com/google/tink/go/proto/common_go_proto"
 )
+
+var keyTypeCodecs = map[spikms.KeyType]uint64{
+	// signing keys
+	spikms.ED25519Type:            fingerprint.ED25519PubKeyMultiCodec,
+	spikms.BLS12381G2Type:         fingerprint.BLS12381g2PubKeyMultiCodec,
+	spikms.ECDSAP256TypeIEEEP1363: fingerprint.P256PubKeyMultiCodec,
+	spikms.ECDSAP256DER:           fingerprint.P256PubKeyMultiCodec,
+	spikms.ECDSAP384TypeIEEEP1363: fingerprint.P384PubKeyMultiCodec,
+	spikms.ECDSAP384DER:           fingerprint.P384PubKeyMultiCodec,
+	spikms.ECDSAP521TypeIEEEP1363: fingerprint.P521PubKeyMultiCodec,
+	spikms.ECDSAP521DER:           fingerprint.P521PubKeyMultiCodec,
+
+	// encryption keys
+	spikms.X25519ECDHKWType:   fingerprint.X25519PubKeyMultiCodec,
+	spikms.NISTP256ECDHKWType: fingerprint.P256PubKeyMultiCodec,
+	spikms.NISTP384ECDHKWType: fingerprint.P384PubKeyMultiCodec,
+	spikms.NISTP521ECDHKWType: fingerprint.P521PubKeyMultiCodec,
+}
+
+func BuildDIDKeyByKeyType(pubKeyBytes []byte, keyType spikms.KeyType) (string, error) {
+	switch keyType {
+	case spikms.X25519ECDHKW:
+		pubKey := &spicrypto.PublicKey{}
+		err := json.Unmarshal(pubKeyBytes, pubKey)
+		if err != nil {
+			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %v", keyType, err)
+		}
+
+		pubKeyBytes = make([]byte, len(pubKey.X))
+		copy(pubKeyBytes, pubKey.X)
+
+	case spikms.NISTP256ECDHKWType, spikms.NISTP384ECDHKWType, spikms.NISTP521ECDHKWType:
+		pubKey := &spicrypto.PublicKey{}
+		err := json.Unmarshal(pubKeyBytes, pubKey)
+		if err != nil {
+			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %v", keyType, err)
+		}
+
+		ecKey, err := comp_crypto.ToECKey(pubKey)
+		if err != nil {
+			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %v", keyType, err)
+		}
+
+		pubKeyBytes = elliptic.MarshalCompressed(ecKey.Curve, ecKey.X, ecKey.Y)
+	}
+
+	if codec, ok := keyTypeCodecs[keyType]; ok {
+		didKey, _ := fingerprint.CreateDIDKeyByCode(codec, pubKeyBytes)
+		return didKey, nil
+	}
+
+	return "", fmt.Errorf("keyType '%s' does not have a multi-base codec", keyType)
+}
 
 // EncryptionPubKeyFromDIDKey 根据 did keyId 计算出公钥对象，包括：
 // 1）椭圆曲线类型

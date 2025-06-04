@@ -1,6 +1,7 @@
 package packager
 
 import (
+	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmsdidkey"
@@ -8,12 +9,16 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
 	"github.com/czh0526/aries-framework-go/component/models/did"
+	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
 	mockstorage "github.com/czh0526/aries-framework-go/component/storage/mock"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
+	comp_mockvdr "github.com/czh0526/aries-framework-go/component/vdr/mock"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
+	mockdiddoc "github.com/czh0526/aries-framework-go/pkg/mock/diddoc"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	"github.com/czh0526/aries-framework-go/spi/secretlock"
+	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
+	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -71,14 +76,24 @@ func packUnpackSuccess(keyType spikms.KeyType, customKMS spikms.KeyManager, cryp
 	resolveDIDFunc, fromDIDKey, toDIDKey, fromDID, toDID := newDIDsAndDIDDocResolverFunc(
 		customKMS, keyType, t)
 
+	mockedProviders := &mockProvider{
+		kms:    customKMS,
+		crypto: cryptoSvc,
+		vdr: &comp_mockvdr.VDRegistry{
+			ResolveFunc: resolveDIDFunc,
+		},
+	}
+
+	testPacker, err := authcrypt.
 }
 
-type resolverFunc func(didID string, opts ...spivdr.DIDMethodOption)
+type resolverFunc func(didID string, opts ...spivdr.DIDMethodOption) (*did.DocResolution, error)
 
 func newDIDsAndDIDDocResolverFunc(customKMS spikms.KeyManager, keyType spikms.KeyType, t *testing.T) (
 	resolverFunc, string, string, *did.Doc, *did.Doc) {
 	t.Helper()
 
+	// sender
 	_, fromKey, err := customKMS.CreateAndExportPubKeyBytes(keyType)
 	require.NoError(t, err)
 
@@ -93,7 +108,56 @@ func newDIDsAndDIDDocResolverFunc(customKMS spikms.KeyManager, keyType spikms.Ke
 		vmKeyType = "X25519KeyAgreementKey2019"
 	}
 
-	fromDID := mockdiddoc.
+	fromDID := mockdiddoc.GetMockDIDDocWithDIDCommV2Bloc(t, "alicedid")
+	fromKA, err := didmodel.NewVerificationMethodFromJWK(
+		fromDID.KeyAgreement[0].VerificationMethod.ID, vmKeyType, fromDID.ID, fromJWK)
+	require.NoError(t, err)
+
+	fromDID.KeyAgreement = []did.Verification{
+		{
+			VerificationMethod: *fromKA,
+		},
+	}
+
+	// receiver
+	_, toKey, err := customKMS.CreateAndExportPubKeyBytes(keyType)
+	require.NoError(t, err)
+
+	toDIDKey, err := kmsdidkey.BuildDIDKeyByKeyType(toKey, keyType)
+	require.NoError(t, err)
+
+	toJWK, err := jwkkid.BuildJWK(toKey, keyType)
+	require.NoError(t, err)
+
+	toDID := mockdiddoc.GetMockDIDDocWithDIDCommV2Bloc(t, "bobdid")
+	toKA, err := did.NewVerificationMethodFromJWK(
+		toDID.KeyAgreement[0].VerificationMethod.ID, vmKeyType, toDID.ID, toJWK)
+	require.NoError(t, err)
+
+	toDID.KeyAgreement = []did.Verification{
+		{
+			VerificationMethod: *toKA,
+		},
+	}
+
+	resolveDID := func(didID string, opts ...spivdr.DIDMethodOption) (*did.DocResolution, error) {
+		switch didID {
+		case toDID.ID:
+			return &did.DocResolution{
+				DIDDocument: toDID,
+			}, nil
+
+		case fromDID.ID:
+			return &did.DocResolution{
+				DIDDocument: fromDID,
+			}, nil
+
+		default:
+			return nil, fmt.Errorf("did not found: %s", didID)
+		}
+	}
+
+	return resolveDID, fromDIDKey, toDIDKey, fromDID, toDID
 }
 
 func newMockKMSProvider(provider *mockstorage.MockStoreProvider, t *testing.T) spikms.Provider {
@@ -108,10 +172,14 @@ func newMockKMSProvider(provider *mockstorage.MockStoreProvider, t *testing.T) s
 
 type kmsProvider struct {
 	kmsStore          spikms.Store
-	secretLockService secretlock.Service
+	secretLockService spisecretlock.Service
 }
 
 type mockProvider struct {
+	storage       *spistorage.Provider
+	kms           spikms.KeyManager
+	secretLock    spisecretlock.Service
+	crypto        spicrypto.Crypto
 	packers       []packer.Packer
 	primaryPacker packer.Packer
 	vdr           vdrapi.Registry

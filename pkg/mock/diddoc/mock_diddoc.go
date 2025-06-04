@@ -35,7 +35,24 @@ func GetMockDIDDocWithDIDCommV2Bloc(t *testing.T, id string) *did.Doc {
 			},
 		},
 		VerificationMethod: []did.VerificationMethod{
-			{},
+			{
+				ID:         peerDID + "#key-1",
+				Controller: peerDID,
+				Type:       "Secp256k1VerificationKey2018",
+				Value:      base58.Decode("H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"),
+			},
+			{
+				ID:         peerDID + "#key-2",
+				Controller: peerDID,
+				Type:       "Ed25519VerificationKey2018",
+				Value:      base58.Decode("H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"),
+			},
+			{
+				ID:         peerDID + "#key-3",
+				Controller: peerDID,
+				Type:       "RsaVerificationKey2018",
+				Value:      base58.Decode("H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"),
+			},
 		},
 		KeyAgreement: []did.Verification{
 			{
