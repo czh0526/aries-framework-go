@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package google.crypto.tink;
+
+import "proto/hmac.proto";
+import "proto/tink/aes_cbc.proto";
+

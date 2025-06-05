@@ -11,6 +11,7 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/doc/jose"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/stretchr/testify/require"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	"testing"
 )
 
@@ -35,9 +36,16 @@ func TestAuthCryptPackerSuccess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("running %s", tt.name), func(t *testing.T) {
-			
+			createAndMarshalKeyByKeyType(t, k, tt.keyType)
 		})
 	}
+}
+
+func createAndMarshalKeyByKeyType(t *testing.T, kms spikms.KeyManager, kt spikms.KeyType) (
+	string, string, []byte, *keyset.Handle) {
+	t.Helper()
+
+	kid, keyHandle, err := kms.Create(kt)
 }
 
 func createKMS(t *testing.T) *localkms.LocalKMS {

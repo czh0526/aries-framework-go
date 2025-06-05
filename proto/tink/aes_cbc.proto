@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package google.crypto.tink;
+
+option go_package = "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/aes_cbc_go_proto";
+
+message AesCbcKeyFormat {
+  uint32 key_size = 1;
+}
+
+message AesCbcKey {
+  uint32 version = 1;
+  bytes key_value = 2;
+}
