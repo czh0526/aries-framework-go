@@ -1,5 +1,20 @@
 package endpoint
 
+type EndpointType int
+
+const (
+	DIDCommV1 EndpointType = iota
+	DIDCommV2
+	Generic
+)
+
+type ServiceEndpoint interface {
+	URI() (string, error)
+	Accept() ([]string, error)
+	RoutingKeys() ([]string, error)
+	Type() EndpointType
+}
+
 type Endpoint struct {
 	rawDIDCommV2 []DIDCommV2Endpoint
 	rawDIDCommV1 string
@@ -25,4 +40,16 @@ func NewDIDCommV2Endpoint(endpoints []DIDCommV2Endpoint) Endpoint {
 	endpoint.rawDIDCommV2 = append(endpoint.rawDIDCommV2, endpoints...)
 
 	return endpoint
+}
+
+func (e *Endpoint) Type() EndpointType {
+	if len(e.rawDIDCommV2) > 0 {
+		return DIDCommV2
+	}
+
+	if e.rawDIDCommV1 != "" {
+		return DIDCommV1
+	}
+
+	return Generic
 }
