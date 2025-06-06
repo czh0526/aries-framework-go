@@ -3,5 +3,17 @@ syntax = "proto3";
 package google.crypto.tink;
 
 import "proto/hmac.proto";
-import "proto/tink/aes_cbc.proto";
+import "aes_cbc.proto";
 
+option go_package = "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/aes_cbc_hmac_aead_go_proto";
+
+message AesCbcHmacAeadKeyFormat {
+  AesCbcKeyFormat aes_cbc_key_format = 1;
+  HmacKeyFormat hmac_key_format = 2;
+}
+
+message AesCbcHmacAeadKey {
+  uint32 version = 1;
+  AesCbcKey aes_cbc_key = 2;
+  HmacKey hmac_key = 3;
+}

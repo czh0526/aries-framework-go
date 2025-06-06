@@ -42,6 +42,13 @@ func NewDIDCommV2Endpoint(endpoints []DIDCommV2Endpoint) Endpoint {
 	return endpoint
 }
 
+// NewDIDCoreEndpoint creates a generic DIDCore endpoint.
+func NewDIDCoreEndpoint(genericEndpoint interface{}) Endpoint {
+	return Endpoint{
+		rawObj: genericEndpoint,
+	}
+}
+
 func (e *Endpoint) Type() EndpointType {
 	if len(e.rawDIDCommV2) > 0 {
 		return DIDCommV2

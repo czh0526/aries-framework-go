@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package google.crypto.tink;
+import "proto/common.proto";
+
+option go_package = "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/secp256k1_go_proto";
+
+enum BitcoinCurveType {
+  INVALID_BITCOIN_CURVE = 0;
+  SECP256K1 = 2;
+}
+
+enum Secp256K1SignatureEncoding {
+  UNKNOWN_BITCOIN_ENCODING = 0;
+  Bitcoin_IEEE_P1363 = 1;
+  Bitcoin_DER = 2;
+}
+
+message Secp256K1Params {
+  HashType hash_type = 1;
+  BitcoinCurveType curve = 2;
+  Secp256K1SignatureEncoding encoding = 3;
+}
+
+message Secp256K1PublicKey {
+  uint32 version = 1;
+  Secp256K1Params params = 2;
+  bytes x = 3;
+  bytes y = 4;
+}
+
+message Secp256K1PrivateKey {
+  uint32 version = 1;
+  Secp256K1PublicKey public_key = 2;
+  bytes key_value = 3;
+}
+
+message Secp256K1KeyFormat {
+  Secp256K1Params params = 2;
+}
+
