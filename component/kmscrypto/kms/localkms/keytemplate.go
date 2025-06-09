@@ -3,11 +3,12 @@ package localkms
 import (
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/secp256k1"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	ecdsapb "github.com/google/tink/go/proto/ecdsa_go_proto"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
+	ecdsapb "github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"google.golang.org/protobuf/proto"
@@ -62,8 +63,9 @@ func keyTemplate(keyType spikms.KeyType, _ ...spikms.KeyOpts) (*tinkpb.KeyTempla
 	case spikms.BLS12381G2Type:
 		return nil, fmt.Errorf("getKeyTemplate: key type `BLS+` is not supported")
 	case spikms.ECDSASecp256k1DER:
-		return secp256k1.D
+		return secp256k1.DERKeyTemplate()
 	case spikms.ECDSASecp256k1TypeIEEEP1363:
+		return secp256k1.IEEEP1363KeyTemplate()
 	default:
 		return nil, fmt.Errorf("getKeyTemplate: key type `%s` unrecognized", keyType)
 	}

@@ -5,7 +5,7 @@ go 1.23.7
 require (
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-00010101000000-000000000000
 	github.com/czh0526/aries-framework-go/spi v0.0.0-00010101000000-000000000000
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 )
 
 require (
