@@ -1,17 +1,21 @@
 package secp256k1
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/btcsuite/btcd/btcec"
 	secp256k1pb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/secp256k1_go_proto"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/secp256k1/subtle"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
-	secp256k1SignerKeyVersion = 0
-	secp256k1SignerTypeURL    = "type.googleapis.com/google.crypto.tink.secp256k1PrivateKey"
+	secp256k1SignerKeyVersion = uint32(0)
+	secp256k1SignerTypeURL    = "type.hyperledger.org/hyperledger.aries.crypto.tink.secp256k1PrivateKey"
 )
 
 var (
@@ -37,7 +41,7 @@ func (km *secp256k1SignerKeyManager) Primitive(serializedKey []byte) (any, error
 	}
 
 	hash, curve, encoding := getSecp256K1ParamNames(key.PublicKey.Params)
-	ret, err := subtleSignature.NewSecp256K1Signer(hash, curve, encoding, key.KeyValue)
+	ret, err := subtle.NewSecp256K1Signer(hash, curve, encoding, key.KeyValue)
 	if err != nil {
 		return nil, fmt.Errorf("secp256k1_signer_key_manager: %w", err)
 	}
@@ -45,27 +49,65 @@ func (km *secp256k1SignerKeyManager) Primitive(serializedKey []byte) (any, error
 	return ret, nil
 }
 
-func (km secp256k1SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	//TODO implement me
-	panic("implement me")
+// NewKey create ECDSAPrivateKey from ECDSAKeyFormat
+func (km *secp256k1SignerKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+	if len(serializedKeyFormat) == 0 {
+		return nil, errInvalidSECP256K1SignKeyFormat
+	}
+
+	keyFormat := new(secp256k1pb.Secp256K1KeyFormat)
+	if err := proto.Unmarshal(serializedKeyFormat, keyFormat); err != nil {
+		return nil, fmt.Errorf("secp256k1_signer_key_manager: invalid proto: %w", err)
+	}
+
+	if err := km.validateKeyFormat(keyFormat); err != nil {
+		return nil, fmt.Errorf("secp256k1_signer_key_manager: invalid key format: %w", err)
+	}
+
+	params := keyFormat.Params
+	tmpKey, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("secp256k1_signer_key_manager: failed to generate ECDSA key: %w", err)
+	}
+
+	keyValue := tmpKey.D.Bytes()
+	pub := newSecp256K1PublicKey(secp256k1SignerKeyVersion, params, tmpKey.X.Bytes(), tmpKey.Y.Bytes())
+	priv := newSecp256K1PrivateKey(secp256k1SignerKeyVersion, pub, keyValue)
+
+	return priv, nil
 }
 
-func (km secp256k1SignerKeyManager) DoesSupport(typeURL string) bool {
-	//TODO implement me
-	panic("implement me")
+func (km *secp256k1SignerKeyManager) DoesSupport(typeURL string) bool {
+	return typeURL == secp256k1SignerTypeURL
 }
 
-func (km secp256k1SignerKeyManager) TypeURL() string {
-	//TODO implement me
-	panic("implement me")
+func (km *secp256k1SignerKeyManager) TypeURL() string {
+	return secp256k1SignerTypeURL
 }
 
-func (km secp256k1SignerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	//TODO implement me
-	panic("implement me")
+func (km *secp256k1SignerKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+	key, err := km.NewKey(serializedKeyFormat)
+	if err != nil {
+		return nil, err
+	}
+
+	serializedKey, err := proto.Marshal(key)
+	if err != nil {
+		return nil, errInvalidSECP256K1SignKeyFormat
+	}
+
+	return &tinkpb.KeyData{
+		TypeUrl:         secp256k1SignerTypeURL,
+		Value:           serializedKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
+	}, nil
 }
 
 func (km *secp256k1SignerKeyManager) validateKey(key *secp256k1pb.Secp256K1PrivateKey) error {
+	return nil
+}
+
+func (km *secp256k1SignerKeyManager) validateKeyFormat(format *secp256k1pb.Secp256K1KeyFormat) error {
 	return nil
 }
 
@@ -79,4 +121,26 @@ func getSecp256K1ParamNames(params *secp256k1pb.Secp256K1Params) (string, string
 	encodingName := secp256k1pb.Secp256K1SignatureEncoding_name[int32(params.Encoding)]
 
 	return hashName, curveName, encodingName
+}
+
+func newSecp256K1PublicKey(version uint32,
+	params *secp256k1pb.Secp256K1Params,
+	x, y []byte) *secp256k1pb.Secp256K1PublicKey {
+
+	return &secp256k1pb.Secp256K1PublicKey{
+		Version: version,
+		Params:  params,
+		X:       x,
+		Y:       y,
+	}
+}
+func newSecp256K1PrivateKey(version uint32,
+	publicKey *secp256k1pb.Secp256K1PublicKey,
+	keyValue []byte) *secp256k1pb.Secp256K1PrivateKey {
+
+	return &secp256k1pb.Secp256K1PrivateKey{
+		Version:   version,
+		PublicKey: publicKey,
+		KeyValue:  keyValue,
+	}
 }

@@ -9,7 +9,7 @@ func init() {
 	if err := registry.RegisterKeyManager(newSecp256K2SignerKeyManager()); err != nil {
 		panic(fmt.Sprintf("signature.init() failed, err = %v", err))
 	}
-	if err := registry.RegisterKeyManager(newSecp256K1VerifierKeyManager()); err != nil {
-		panic(fmt.Sprintf("signature.init() failed, err = %v", err))
-	}
+	//if err := registry.RegisterKeyManager(newSecp256K1VerifierKeyManager()); err != nil {
+	//	panic(fmt.Sprintf("signature.init() failed, err = %v", err))
+	//}
 }
