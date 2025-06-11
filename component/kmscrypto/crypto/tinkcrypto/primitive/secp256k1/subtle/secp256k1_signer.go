@@ -2,9 +2,11 @@ package subtle
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/tink-crypto/tink-go/v2/subtle"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	"hash"
 	"math/big"
 )
@@ -14,6 +16,30 @@ type Secp256K1Signer struct {
 	hashFunc   func() hash.Hash
 	encoding   string
 }
+
+func (e *Secp256K1Signer) Sign(data []byte) ([]byte, error) {
+	hashed, err := subtle.ComputeHash(e.hashFunc, data)
+	if err != nil {
+		return nil, err
+	}
+
+	r, s, err := ecdsa.Sign(rand.Reader, e.privateKey, hashed)
+	if err != nil {
+		return nil, err
+	}
+
+	sig := NewSecp256K1Signature(r, s)
+
+	ret, err := sig.EncodeSecp256K1Signature(
+		e.encoding, e.privateKey.PublicKey.Curve.Params().Name)
+	if err != nil {
+		return nil, fmt.Errorf("secp256k1_signer: failed to encode signature: %w", err)
+	}
+
+	return ret, nil
+}
+
+var _ tink.Signer = (*Secp256K1Signer)(nil)
 
 func NewSecp256K1Signer(hashAlg string,
 	curve string,

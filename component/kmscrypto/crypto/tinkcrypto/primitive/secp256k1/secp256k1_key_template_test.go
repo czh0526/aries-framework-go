@@ -1,9 +1,11 @@
 package secp256k1
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
+	"github.com/tink-crypto/tink-go/v2/signature"
 	"testing"
 )
 
@@ -35,6 +37,52 @@ func TestKeyTemplate(t *testing.T) {
 			kh, err = keyset.NewHandle(tc.template)
 			require.NoError(t, err)
 			require.NotEmpty(t, kh)
+
+			err = testSignVerify(kh)
+			require.NoError(t, err)
 		})
 	}
+}
+
+func testSignVerify(kh *keyset.Handle) error {
+	signer, err := signature.NewSigner(kh)
+	if err != nil {
+		return fmt.Errorf("signature.NewSigner() failed: %v", err)
+	}
+
+	testInputs := []struct {
+		message1 []byte
+		message2 []byte
+	}{
+		{
+			message1: []byte("this data needs to be signed"),
+			message2: []byte("this data needs to be signed"),
+		},
+		{
+			message1: []byte(""),
+			message2: []byte(""),
+		},
+		{
+			message1: []byte(""),
+			message2: nil,
+		},
+		{
+			message1: nil,
+			message2: []byte(""),
+		},
+		{
+			message1: nil,
+			message2: nil,
+		},
+	}
+
+	for _, ti := range testInputs {
+		sig, err := signer.Sign(ti.message1)
+		if err != nil {
+			return fmt.Errorf("signer.Sign(ti.message1) failed: %v", err)
+		}
+		fmt.Printf("sig: %x \n", sig)
+	}
+
+	return nil
 }

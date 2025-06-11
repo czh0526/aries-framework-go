@@ -1,14 +1,24 @@
-                register
-KeyManager -----------------> registry
+                    KeyManager
+KeyManager ----------------------------------> registry
+                RegisterKeyManager(km)
 
 
 
-
-             key_template
-keyset ----------------------> KeyHandle
-
+              tinkpb.KeyTemplate
+keyset ------------------------------------> KeyHandle
+                NewHandle(kt)
 
 
 
                     KeyHandle
 tink-package -------------------------> Primitive 
+
+
+
+                  keyset
+        ____________|___________
+        |                       |
+     Manager                  Handle
+        \                       /
+         \                     /
+              tinkpb.Keyset
