@@ -5,7 +5,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
-	"github.com/tink-crypto/tink-go/v2/signature"
+	tinksignature "github.com/tink-crypto/tink-go/v2/signature"
 	"testing"
 )
 
@@ -45,7 +45,7 @@ func TestKeyTemplate(t *testing.T) {
 }
 
 func testSignVerify(kh *keyset.Handle) error {
-	signer, err := signature.NewSigner(kh)
+	signer, err := tinksignature.NewSigner(kh)
 	if err != nil {
 		return fmt.Errorf("signature.NewSigner() failed: %v", err)
 	}
