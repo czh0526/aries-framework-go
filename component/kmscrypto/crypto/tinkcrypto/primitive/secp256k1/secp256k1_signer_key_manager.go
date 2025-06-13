@@ -103,6 +103,24 @@ func (km *secp256k1SignerKeyManager) NewKeyData(serializedKeyFormat []byte) (*ti
 	}, nil
 }
 
+func (km *secp256k1SignerKeyManager) PublicKeyData(serializedPrivKey []byte) (*tinkpb.KeyData, error) {
+	privKey := new(secp256k1pb.Secp256K1PrivateKey)
+	if err := proto.Unmarshal(serializedPrivKey, privKey); err != nil {
+		return nil, err
+	}
+
+	serializedPubKey, err := proto.Marshal(privKey.PublicKey)
+	if err != nil {
+		return nil, errInvalidSECP256K1SignKey
+	}
+
+	return &tinkpb.KeyData{
+		TypeUrl:         secp256k1VerifierKeyTypeURL,
+		Value:           serializedPubKey,
+		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
+	}, nil
+}
+
 func (km *secp256k1SignerKeyManager) validateKey(key *secp256k1pb.Secp256K1PrivateKey) error {
 	return nil
 }
@@ -121,6 +139,26 @@ func getSecp256K1ParamNames(params *secp256k1pb.Secp256K1Params) (string, string
 	encodingName := secp256k1pb.Secp256K1SignatureEncoding_name[int32(params.Encoding)]
 
 	return hashName, curveName, encodingName
+}
+
+func ValidateSecp256K1Params(hashAlg, curve, encoding string) error {
+	switch encoding {
+	case "Bitcoin_DER":
+	case "Bitcoin_IEEE_P1363":
+	default:
+		return errors.New("secp256k1: unsupported encoding")
+	}
+
+	switch curve {
+	case "SECP256K1":
+		if hashAlg != "SHA256" {
+			return errors.New("invalid hash type for secp256k1 curve, expect `SHA256`")
+		}
+	default:
+		return fmt.Errorf("unsupported curve: %s", curve)
+	}
+
+	return nil
 }
 
 func newSecp256K1PublicKey(version uint32,

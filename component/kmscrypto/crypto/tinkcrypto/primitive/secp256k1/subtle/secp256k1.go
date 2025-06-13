@@ -69,3 +69,25 @@ func (sig *Secp256k1Signature) EncodeSecp256K1Signature(encoding string, curveNa
 func NewSecp256K1Signature(r, s *big.Int) *Secp256k1Signature {
 	return &Secp256k1Signature{r, s}
 }
+
+func DecodeSecp256K1Signature(encodedBytes []byte, encoding string) (*Secp256k1Signature, error) {
+	var (
+		sig *Secp256k1Signature
+		err error
+	)
+
+	switch encoding {
+	case secp256k1pb.Secp256K1SignatureEncoding_Bitcoin_IEEE_P1363.String():
+		sig, err = ieeeP1363Decode(encodedBytes)
+	case secp256k1pb.Secp256K1SignatureEncoding_Bitcoin_DER.String():
+		sig, err = asn1decode(encodedBytes)
+	default:
+		err = errUnsupportedEncoding
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("secp256k1: %v", err)
+	}
+
+	return sig, nil
+}

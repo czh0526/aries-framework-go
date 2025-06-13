@@ -15,6 +15,9 @@ type KeyManager interface {
 }
 
 type Store interface {
+	Put(keysetID string, key []byte) error
+	Get(keysetID string) (key []byte, err error)
+	Delete(keysetID string) error
 }
 
 type Provider interface {
