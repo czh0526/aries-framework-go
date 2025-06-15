@@ -9,7 +9,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	commonpb "github.com/google/tink/go/proto/common_go_proto"
+	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 )
 
 var keyTypeCodecs = map[spikms.KeyType]uint64{

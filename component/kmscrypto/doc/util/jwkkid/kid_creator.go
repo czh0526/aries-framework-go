@@ -13,7 +13,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk/jwksupport"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	hybrid "github.com/google/tink/go/hybrid/subtle"
+	hybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"math/big"
 )
 

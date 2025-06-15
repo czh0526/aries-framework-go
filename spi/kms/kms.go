@@ -1,5 +1,7 @@
 package kms
 
+import spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
+
 type KeyManager interface {
 	Create(kt KeyType, opts ...KeyOpts) (string, interface{}, error)
 
@@ -21,6 +23,8 @@ type Store interface {
 }
 
 type Provider interface {
+	StorageProvider() Store
+	SecretLock() spisecretlock.Service
 }
 
 type Creator func(provider Provider) (KeyManager, error)
