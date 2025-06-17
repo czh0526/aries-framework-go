@@ -2,9 +2,11 @@ package localkms
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/x509"
 	"fmt"
 	secp256k1pb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/secp256k1_go_proto"
+	secp256k1subtle "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/secp256k1/subtle"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
@@ -13,6 +15,7 @@ import (
 	ed25519pb "github.com/tink-crypto/tink-go/v2/proto/ed25519_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"github.com/tink-crypto/tink-go/v2/subtle"
+	"google.golang.org/protobuf/proto"
 )
 
 func PublicKeyBytesToHandle(pubKey []byte, kt spikms.KeyType, opts ...spikms.KeyOpts) (*keyset.Handle, error) {
@@ -139,7 +142,7 @@ func getMarshalledProtoKeyAndKeyURL(pubKey []byte, kt spikms.KeyType, opts ...sp
 	case spikms.ECDSASecp256k1TypeIEEEP1363:
 		tURL = secp256k1VerifierTypeURL
 
-		keyValue, err = getMashalledECDSASecp256K1IEEEP1363Key(
+		keyValue, err = getMarshalledECDSASecp256K1IEEEP1363Key(
 			pubKey,
 			"SECP256K1",
 			secp256k1pb.BitcoinCurveType_SECP256K1,
@@ -175,14 +178,97 @@ func getMarshalledECDSADERKey(marshaledPubKey []byte, curveName string, curveTyp
 		return nil, fmt.Errorf("public key reader: not an ecdsa public key")
 	}
 
-	oarams := *ecdsapb.EcdsaParams{
-		Curve: c,
+	params := &ecdsapb.EcdsaParams{
+		Curve:    curveType,
+		Encoding: ecdsapb.EcdsaSignatureEncoding_DER,
+		HashType: hashType,
 	}
+
+	return getMarshalledECDSAKey(ecPubKey, params)
 }
 
 func getMarshalledECDSASecp256K1DERKey(marshaledPubKey []byte, curveName string, curveType secp256k1pb.BitcoinCurveType,
 	hashType commonpb.HashType) ([]byte, error) {
+	curve := secp256k1subtle.GetCurve(curveName)
+	if curve == nil {
+		return nil, fmt.Errorf("undefined curve")
+	}
 
+	pubKey, err := x509.ParsePKIXPublicKey(marshaledPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	ecPubKey, ok := pubKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("public key reader: not an ecdsa public key")
+	}
+
+	params := &secp256k1pb.Secp256K1Params{
+		Curve:    curveType,
+		Encoding: secp256k1pb.Secp256K1SignatureEncoding_Bitcoin_DER,
+		HashType: hashType,
+	}
+
+	return getMarshalledSecp256Key(ecPubKey, params)
+}
+
+func getMarshalledECDSAIEEEP1363Key(marshaledPubKey []byte, curveName string, curveType commonpb.EllipticCurveType,
+	hashType commonpb.HashType) ([]byte, error) {
+	curve := subtle.GetCurve(curveName)
+	if curve == nil {
+		return nil, fmt.Errorf("undefined curve")
+	}
+
+	x, y := elliptic.Unmarshal(curve, marshaledPubKey)
+	if x == nil || y == nil {
+		return nil, fmt.Errorf("faild to unmarshal public ecdsa key")
+	}
+
+	params := &ecdsapb.EcdsaParams{
+		Curve:    curveType,
+		Encoding: ecdsapb.EcdsaSignatureEncoding_IEEE_P1363,
+		HashType: hashType,
+	}
+
+	return getMarshalledECDSAKey(&ecdsa.PublicKey{
+		X:     x,
+		Y:     y,
+		Curve: curve,
+	}, params)
+}
+
+func getMarshalledECDSASecp256K1IEEEP1363Key(marshaledPubKey []byte, curveName string, curveType secp256k1pb.BitcoinCurveType,
+	hashType commonpb.HashType) ([]byte, error) {
+	curve := secp256k1subtle.GetCurve(curveName)
+	if curve == nil {
+		return nil, fmt.Errorf("undefined curve")
+	}
+
+	x, y := elliptic.Unmarshal(curve, marshaledPubKey)
+	if x == nil || y == nil {
+		return nil, fmt.Errorf("failed to unmarshal public ecdsa key")
+	}
+
+	params := &secp256k1pb.Secp256K1Params{
+		Curve:    curveType,
+		Encoding: secp256k1pb.Secp256K1SignatureEncoding_Bitcoin_IEEE_P1363,
+		HashType: hashType,
+	}
+
+	return getMarshalledSecp256Key(&ecdsa.PublicKey{
+		X:     x,
+		Y:     y,
+		Curve: curve,
+	}, params)
+}
+
+func getMarshalledECDSAKey(ecPubKey *ecdsa.PublicKey, params *ecdsapb.EcdsaParams) ([]byte, error) {
+	return proto.Marshal(newProtoECDSAPublicKey(ecPubKey, params))
+}
+
+func getMarshalledSecp256Key(ecPubKey *ecdsa.PublicKey, params *secp256k1pb.Secp256K1Params) ([]byte, error) {
+	return proto.Marshal(newProtoSecp256K1PublicKey(ecPubKey, params))
 }
 
 func newProtoECDSAPublicKey(ecPubKey *ecdsa.PublicKey, params *ecdsapb.EcdsaParams) *ecdsapb.EcdsaPublicKey {
