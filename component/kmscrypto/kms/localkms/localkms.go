@@ -17,8 +17,6 @@ import (
 	"github.com/tink-crypto/tink-go/v2/aead"
 	tinkaead "github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/keyset"
-	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -92,8 +90,7 @@ func (l *LocalKMS) CreateAndExportPubKeyBytes(kt spikms.KeyType, opts ...spikms.
 }
 
 func (l *LocalKMS) PubKeyBytesToHandle(pubKey []byte, kt spikms.KeyType, opts ...spikms.KeyOpts) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return PublicKeyBytesToHandle(pubKey, kt, opts...)
 }
 
 func (l *LocalKMS) ImportPrivateKey(privKey interface{}, kt spikms.KeyType, opts ...spikms.PrivateKeyOpts) (string, interface{}, error) {
@@ -107,48 +104,6 @@ func (l *LocalKMS) ImportPrivateKey(privKey interface{}, kt spikms.KeyType, opts
 	default:
 		return "", nil, fmt.Errorf("import private key does not support this key type or key is public")
 	}
-}
-
-func (l *LocalKMS) importECDSKey(privKey *ecdsa.PrivateKey, kt spikms.KeyType, opts ...spikms.KeyOpts) (string, *keyset.Handle, error) {
-
-}
-
-func (l *LocalKMS) importKeySet(ks *tinkpb.Keyset, opts ...spikms.PrivateKeyOpts) (string, *keyset.Handle, error) {
-	ksID, err := l.writeImportedKey(ks, opts...)
-
-}
-
-func (l *LocalKMS) writeImportedKey(ks *tinkpb.Keyset, opts ...spikms.PrivateKeyOpts) (string, error) {
-	serializedKeyset, err := proto.Marshal(ks)
-	if err != nil {
-		return "", fmt.Errorf("invalid keyset data")
-	}
-
-	encrypted, err := l.primaryKeyEnvAEAD.Encrypt(serializedKeyset, []byte{})
-	if err != nil {
-		return "", fmt.Errorf("encrypted failed: %w", err)
-	}
-
-	ksInfo, err := getKeysetInfo(ks)
-	if err != nil {
-		return "", fmt.Errorf("cannot get keyset info: %w", err)
-	}
-
-	encryptedKeyset := &tinkpb.EncryptedKeyset{
-		EncryptedKeyset: encrypted,
-
-		KeysetInfo: ksInfo,
-	}
-
-	buf := new(bytes.Buffer)
-	jsonKeysetWriter := keyset.NewJSONWriter(buf)
-
-	err = jsonKeysetWriter.WriteEncrypted(encryptedKeyset)
-	if err != nil {
-		return "", fmt.Errorf("failed to write keyset as json: %w", err)
-	}
-
-	return writeToStore(l.store, buf, opts...)
 }
 
 func (l *LocalKMS) getKeySet(id string) (*keyset.Handle, error) {
@@ -227,6 +182,7 @@ func (l *LocalKMS) storeKeySet(kh *keyset.Handle, kt spikms.KeyType) (string, er
 	return writeToStore(l.store, buf)
 }
 
+// writeToStore 将 buffer 中的数据写入到 store 中，并返回 keysetID
 func writeToStore(store spikms.Store, buf *bytes.Buffer, opts ...spikms.PrivateKeyOpts) (string, error) {
 	w := newWriter(store, opts...)
 
