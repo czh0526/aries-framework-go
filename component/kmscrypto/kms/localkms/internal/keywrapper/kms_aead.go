@@ -8,6 +8,8 @@ import (
 	"regexp"
 )
 
+const LocalKeyURIPrefix = "local-lock://"
+
 type LocalAEAD struct {
 	keyURI     string
 	secretLock spisecretlock.Service
@@ -70,7 +72,7 @@ func trimPrefix(keyURI string) (string, error) {
 	if len(loc) == 0 || loc[0] > 0 {
 		return "", errors.New("keyURI must have a prefix in form `prefixname://`")
 	}
-	if loc[1] <= len(keyURI) {
+	if loc[1] == len(keyURI) {
 		return "", errors.New("keyURI can't consist only from a prefix")
 	}
 
