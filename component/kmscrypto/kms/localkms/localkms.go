@@ -26,9 +26,9 @@ const (
 )
 
 type LocalKMS struct {
+	store             spikms.Store
 	secretLock        spisecretlock.Service
 	primaryKeyURI     string
-	store             spikms.Store
 	primaryKeyEnvAEAD *tinkaead.KMSEnvelopeAEAD
 }
 
@@ -41,11 +41,13 @@ func (l *LocalKMS) Create(kt spikms.KeyType, opts ...spikms.KeyOpts) (string, in
 		return "", nil, fmt.Errorf("create: Unable to create kms key: Secp256K1 is not supported by DER format")
 	}
 
+	// 通过 KeyType 查找 keyTemplate
 	keyTemplate, err := getKeyTemplate(kt, opts...)
 	if err != nil {
 		return "", nil, fmt.Errorf("create: failed to getKeyTemplate: %v", err)
 	}
 
+	// 通过 KeyTemplate 获取 KeyHandle
 	kh, err := keyset.NewHandle(keyTemplate)
 	if err != nil {
 		return "", nil, fmt.Errorf("create: failed to create new keyset handle: %v", err)
@@ -106,11 +108,13 @@ func (l *LocalKMS) ImportPrivateKey(privKey interface{}, kt spikms.KeyType, opts
 	}
 }
 
+// getKeySet 读取 keyset 的 Handle
 func (l *LocalKMS) getKeySet(id string) (*keyset.Handle, error) {
+	// 构造 Key 对应的 Reader 对象
 	localDBReader := newReader(l.store, id)
-
 	jsonKeysetReader := keyset.NewJSONReader(localDBReader)
 
+	// 通过 KMSEnvelopeAEAD 读取 KeyHandle 对象
 	kh, err := keyset.Read(jsonKeysetReader, l.primaryKeyEnvAEAD)
 	if err != nil {
 		return nil, fmt.Errorf("getKeySet: failed to read json keyset from reader: %v", err)
@@ -167,6 +171,7 @@ func (l *LocalKMS) storeKeySet(kh *keyset.Handle, kt spikms.KeyType) (string, er
 		}
 	}
 
+	// 使用 KeyEnvAEAD 加密
 	buf := new(bytes.Buffer)
 	jsonKeysetWriter := keyset.NewJSONWriter(buf)
 
@@ -224,4 +229,21 @@ func New(primaryKeyURI string, p spikms.Provider) (*LocalKMS, error) {
 		primaryKeyURI:     primaryKeyURI,
 		primaryKeyEnvAEAD: keyEnvelopeAEAD,
 	}, nil
+}
+
+func (l *LocalKMS) Rotate(kt spikms.KeyType, keyID string, opts ...spikms.KeyOpts) (string, interface{}, error) {
+	kh, err := l.getKeySet(keyID)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to getKeySet: %v", err)
+	}
+
+	keyTemplate, err := getKeyTemplate(kt, opts...)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to getKeyTemplate: %v", err)
+	}
+
+	km := keyset.NewManagerFromHandle(kh)
+
+	err = km.Rotate(keyTemplate)
+
 }
