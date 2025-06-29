@@ -2,6 +2,8 @@ package localkms
 
 import (
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms/internal/keywrapper"
 	mocksecretlock "github.com/czh0526/aries-framework-go/component/kmscrypto/mock/secretlock"
@@ -100,6 +102,41 @@ func TestNewKMS(t *testing.T) {
 		require.NotEmpty(t, id)
 
 		newID, kh, err := localKms.Rotate("", id)
+		require.Error(t, err)
+		require.Empty(t, kh)
+		require.Empty(t, newID)
 
+		newID, kh, err = localKms.Rotate("unsupported", id)
+		require.Error(t, err)
+		require.Empty(t, kh)
+		require.Empty(t, newID)
+
+		id, kh, err = localKms.Rotate(spikms.AES128GCMType, id)
+		require.Error(t, err)
+		require.Empty(t, kh)
+		require.Empty(t, id)
+	})
+
+	t.Run("test Create() with failure to store key", func(t *testing.T) {
+		putErr := fmt.Errorf("failed to put data")
+		errGet := kms.ErrKeyNotFound
+		mockStore := &mockStore{
+			errPut: putErr,
+			errGet: errGet,
+		}
+
+		localKms, err := New(testMasterKeyURI, &mockProvider{
+			storage: mockStore,
+			secretLock: &mocksecretlock.MockSecretLock{
+				ValEncrypt: base64.URLEncoding.EncodeToString([]byte("encrypt-msg")),
+				ValDecrypt: base64.URLEncoding.EncodeToString([]byte("decrypt-msg")),
+			},
+		})
+		require.NoError(t, err)
+
+		id, kh, err := localKms.Create(spikms.AES128GCMType)
+		require.True(t, errors.Is(err, putErr))
+		require.Empty(t, kh)
+		require.Empty(t, id)
 	})
 }

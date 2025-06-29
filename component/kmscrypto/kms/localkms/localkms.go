@@ -244,6 +244,29 @@ func (l *LocalKMS) Rotate(kt spikms.KeyType, keyID string, opts ...spikms.KeyOpt
 
 	km := keyset.NewManagerFromHandle(kh)
 
-	err = km.Rotate(keyTemplate)
+	newKeyID, err := km.Add(keyTemplate)
+	if err != nil {
+		return "", nil, err
+	}
+	err = km.SetPrimary(newKeyID)
+	if err != nil {
+		return "", nil, err
+	}
 
+	updatedKH, err := km.Handle()
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to get kms keyset Handle: %v", err)
+	}
+
+	err = l.store.Delete(keyID)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to delete entry for kid `%s`: %v", keyID, err)
+	}
+
+	newID, err := l.storeKeySet(updatedKH, kt)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to store keySet: %v", err)
+	}
+
+	return newID, updatedKH, nil
 }
