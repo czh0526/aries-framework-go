@@ -52,7 +52,7 @@ func (V VDR) Close() error {
 func New(p spistorage.Provider) (*VDR, error) {
 	didDBStore, err := p.OpenStore(StoreNamespace)
 	if err != nil {
-		return nil, fmt.Errorf("open store: %v", err)
+		return nil, fmt.Errorf("open store: %w", err)
 	}
 
 	return &VDR{

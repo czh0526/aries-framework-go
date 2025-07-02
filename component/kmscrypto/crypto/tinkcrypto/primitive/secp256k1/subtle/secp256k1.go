@@ -86,7 +86,7 @@ func DecodeSecp256K1Signature(encodedBytes []byte, encoding string) (*Secp256k1S
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("secp256k1: %v", err)
+		return nil, fmt.Errorf("secp256k1: %w", err)
 	}
 
 	return sig, nil

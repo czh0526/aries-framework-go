@@ -34,7 +34,7 @@ func NewSecp256K1VerifierFromPublicKey(hashAlg, encoding string, publicKey *ecds
 
 	curve := ConvertCurveName(publicKey.Curve.Params().Name)
 	if err := ValidateSecp256K1Params(hashAlg, curve, encoding); err != nil {
-		return nil, fmt.Errorf("ecdsa_verifier: %v", err)
+		return nil, fmt.Errorf("ecdsa_verifier: %w", err)
 	}
 
 	hashFunc := subtle.GetHashFunc(hashAlg)
@@ -48,7 +48,7 @@ func NewSecp256K1VerifierFromPublicKey(hashAlg, encoding string, publicKey *ecds
 func (v *ECDSAVerifier) Verify(signatureBytes, data []byte) error {
 	signature, err := DecodeSecp256K1Signature(signatureBytes, v.encoding)
 	if err != nil {
-		return fmt.Errorf("secp256k1_verifier: %v", err)
+		return fmt.Errorf("secp256k1_verifier: %w", err)
 	}
 
 	hashed, err := subtle.ComputeHash(v.hashFunc, data)

@@ -41,7 +41,7 @@ func New(opts ...ProviderOption) (*Provider, error) {
 	for _, option := range opts {
 		err := option(&provider)
 		if err != nil {
-			return nil, fmt.Errorf("option failed: %v", err)
+			return nil, fmt.Errorf("option failed: %w", err)
 		}
 	}
 

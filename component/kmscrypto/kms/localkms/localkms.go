@@ -44,18 +44,18 @@ func (l *LocalKMS) Create(kt spikms.KeyType, opts ...spikms.KeyOpts) (string, in
 	// 通过 KeyType 查找 keyTemplate
 	keyTemplate, err := getKeyTemplate(kt, opts...)
 	if err != nil {
-		return "", nil, fmt.Errorf("create: failed to getKeyTemplate: %v", err)
+		return "", nil, fmt.Errorf("failed to getKeyTemplate: %w", err)
 	}
 
 	// 通过 KeyTemplate 获取 KeyHandle
 	kh, err := keyset.NewHandle(keyTemplate)
 	if err != nil {
-		return "", nil, fmt.Errorf("create: failed to create new keyset handle: %v", err)
+		return "", nil, fmt.Errorf("create: failed to create new keyset handle: %w", err)
 	}
 
 	keyID, err := l.storeKeySet(kh, kt)
 	if err != nil {
-		return "", nil, fmt.Errorf("create: failed to store keyset: %v", err)
+		return "", nil, fmt.Errorf("create: failed to store keyset: %w", err)
 	}
 
 	return keyID, kh, nil
@@ -69,12 +69,12 @@ func (l *LocalKMS) ExportPubKeyBytes(id string) ([]byte, spikms.KeyType, error) 
 	// 根据 id 获取 Keyset Handle
 	kh, err := l.getKeySet(id)
 	if err != nil {
-		return nil, "", fmt.Errorf("exportPubKeyBytes: failed to get keyset handle: %v", err)
+		return nil, "", fmt.Errorf("exportPubKeyBytes: failed to get keyset handle: %w", err)
 	}
 
 	marshalledKey, kt, err := l.exportPubKeyBytes(kh)
 	if err != nil {
-		return nil, "", fmt.Errorf("exportPubKeyBytes: failed to export marshalled key: %v", err)
+		return nil, "", fmt.Errorf("exportPubKeyBytes: failed to export marshalled key: %w", err)
 	}
 
 	if kt == spikms.CLCredDefType {
@@ -87,8 +87,17 @@ func (l *LocalKMS) ExportPubKeyBytes(id string) ([]byte, spikms.KeyType, error) 
 }
 
 func (l *LocalKMS) CreateAndExportPubKeyBytes(kt spikms.KeyType, opts ...spikms.KeyOpts) (string, []byte, error) {
-	//TODO implement me
-	panic("implement me")
+	kid, _, err := l.Create(kt, opts...)
+	if err != nil {
+		return "", nil, fmt.Errorf("createAndExportPubKeyBytes: failed to create new key: %w", err)
+	}
+
+	pubKeyBytes, _, err := l.ExportPubKeyBytes(kid)
+	if err != nil {
+		return "", nil, fmt.Errorf("createAndExportPubKeyBytes: failed to export new public key bytes: %w", err)
+	}
+
+	return kid, pubKeyBytes, nil
 }
 
 func (l *LocalKMS) PubKeyBytesToHandle(pubKey []byte, kt spikms.KeyType, opts ...spikms.KeyOpts) (interface{}, error) {
@@ -117,7 +126,7 @@ func (l *LocalKMS) getKeySet(id string) (*keyset.Handle, error) {
 	// 通过 KMSEnvelopeAEAD 读取 KeyHandle 对象
 	kh, err := keyset.Read(jsonKeysetReader, l.primaryKeyEnvAEAD)
 	if err != nil {
-		return nil, fmt.Errorf("getKeySet: failed to read json keyset from reader: %v", err)
+		return nil, fmt.Errorf("getKeySet: failed to read json keyset from reader: %w", err)
 	}
 
 	return kh, nil
@@ -127,7 +136,7 @@ func (l *LocalKMS) getKeySet(id string) (*keyset.Handle, error) {
 func (l *LocalKMS) generateKID(kh *keyset.Handle, kt spikms.KeyType) (string, error) {
 	keyBytes, _, err := l.exportPubKeyBytes(kh)
 	if err != nil {
-		return "", fmt.Errorf("generateKID: failed to export public key: %v", err)
+		return "", fmt.Errorf("generateKID: failed to export public key: %w", err)
 	}
 
 	return jwkkid.CreateKID(keyBytes, kt)
@@ -136,7 +145,7 @@ func (l *LocalKMS) generateKID(kh *keyset.Handle, kt spikms.KeyType) (string, er
 func (l *LocalKMS) exportPubKeyBytes(kh *keyset.Handle) ([]byte, spikms.KeyType, error) {
 	pubKH, err := kh.Public()
 	if err != nil {
-		return nil, "", fmt.Errorf("exportPubKeyBytes: failed to get public keyset handle: %v", err)
+		return nil, "", fmt.Errorf("exportPubKeyBytes: failed to get public keyset handle: %w", err)
 	}
 
 	buf := new(bytes.Buffer)
@@ -167,7 +176,7 @@ func (l *LocalKMS) storeKeySet(kh *keyset.Handle, kt spikms.KeyType) (string, er
 	default:
 		kid, err = l.generateKID(kh, kt)
 		if err != nil && !errors.Is(err, errInvalidKeyType) {
-			return "", fmt.Errorf("storeKeySet: failed to generate kid: %v", err)
+			return "", fmt.Errorf("storeKeySet: failed to generate kid: %w", err)
 		}
 	}
 
@@ -177,7 +186,7 @@ func (l *LocalKMS) storeKeySet(kh *keyset.Handle, kt spikms.KeyType) (string, er
 
 	err = kh.Write(jsonKeysetWriter, l.primaryKeyEnvAEAD)
 	if err != nil {
-		return "", fmt.Errorf("storeKeySet: failed to write json key to buffer: %v", err)
+		return "", fmt.Errorf("storeKeySet: failed to write json key to buffer: %w", err)
 	}
 
 	if kid != "" {
@@ -193,7 +202,7 @@ func writeToStore(store spikms.Store, buf *bytes.Buffer, opts ...spikms.PrivateK
 
 	_, err := w.Write(buf.Bytes())
 	if err != nil {
-		return "", fmt.Errorf("writeToStore: failed to write buffer to store: %v", err)
+		return "", fmt.Errorf("writeToStore: failed to write buffer to store: %w", err)
 	}
 
 	return w.KeysetID, nil
@@ -218,7 +227,7 @@ func New(primaryKeyURI string, p spikms.Provider) (*LocalKMS, error) {
 
 	kw, err := keywrapper.New(secretLock, primaryKeyURI)
 	if err != nil {
-		return nil, fmt.Errorf("new: failed to create new keywrapper: %v", err)
+		return nil, fmt.Errorf("new: failed to create new keywrapper: %w", err)
 	}
 
 	keyEnvelopeAEAD := aead.NewKMSEnvelopeAEAD2(aead.AES256GCMKeyTemplate(), kw)
@@ -229,44 +238,4 @@ func New(primaryKeyURI string, p spikms.Provider) (*LocalKMS, error) {
 		primaryKeyURI:     primaryKeyURI,
 		primaryKeyEnvAEAD: keyEnvelopeAEAD,
 	}, nil
-}
-
-func (l *LocalKMS) Rotate(kt spikms.KeyType, keyID string, opts ...spikms.KeyOpts) (string, interface{}, error) {
-	kh, err := l.getKeySet(keyID)
-	if err != nil {
-		return "", nil, fmt.Errorf("rotate: failed to getKeySet: %v", err)
-	}
-
-	keyTemplate, err := getKeyTemplate(kt, opts...)
-	if err != nil {
-		return "", nil, fmt.Errorf("rotate: failed to getKeyTemplate: %v", err)
-	}
-
-	km := keyset.NewManagerFromHandle(kh)
-
-	newKeyID, err := km.Add(keyTemplate)
-	if err != nil {
-		return "", nil, err
-	}
-	err = km.SetPrimary(newKeyID)
-	if err != nil {
-		return "", nil, err
-	}
-
-	updatedKH, err := km.Handle()
-	if err != nil {
-		return "", nil, fmt.Errorf("rotate: failed to get kms keyset Handle: %v", err)
-	}
-
-	err = l.store.Delete(keyID)
-	if err != nil {
-		return "", nil, fmt.Errorf("rotate: failed to delete entry for kid `%s`: %v", keyID, err)
-	}
-
-	newID, err := l.storeKeySet(updatedKH, kt)
-	if err != nil {
-		return "", nil, fmt.Errorf("rotate: failed to store keySet: %v", err)
-	}
-
-	return newID, updatedKH, nil
 }

@@ -27,7 +27,7 @@ func (a *AESCBC) Encrypt(plaintext []byte) ([]byte, error) {
 
 	cbc, err := newCipher(a.Key, iv, false)
 	if err != nil {
-		return nil, fmt.Errorf("aes_cbc: Encrypt() failed: %v", err)
+		return nil, fmt.Errorf("aes_cbc: Encrypt() failed: %w", err)
 	}
 
 	ciphertext := make([]byte, AESCBCIVSize+plainTextSize)
@@ -80,7 +80,7 @@ func (a *AESCBC) newIV() []byte {
 func newCipher(key []byte, iv []byte, decrypt bool) (cipher.BlockMode, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("aes_cbc: failed to create block cipher, error: %v", err)
+		return nil, fmt.Errorf("aes_cbc: failed to create block cipher, error: %w", err)
 	}
 
 	if len(iv) < aes.BlockSize {
@@ -97,7 +97,7 @@ func newCipher(key []byte, iv []byte, decrypt bool) (cipher.BlockMode, error) {
 func NewAESCBC(key []byte) (*AESCBC, error) {
 	keySize := uint32(len(key))
 	if err := ValidateAESKeySize(keySize); err != nil {
-		return nil, fmt.Errorf("aes_cbc: NewAESCBC() failed, err = %v", err)
+		return nil, fmt.Errorf("aes_cbc: NewAESCBC() failed, err = %w", err)
 	}
 
 	return &AESCBC{Key: key}, nil

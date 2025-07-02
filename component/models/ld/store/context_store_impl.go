@@ -35,7 +35,7 @@ func (c ContextStoreImpl) Import(documents []ldcontext.Document) error {
 	for _, doc := range documents {
 		b, err := getRemoteDocumentBytes(doc)
 		if err != nil {
-			return fmt.Errorf("get remote document bytes failed, err = %v", err)
+			return fmt.Errorf("get remote document bytes failed, err = %w", err)
 		}
 
 		// storage 中有的，并且hash一样的，不用重复存储
@@ -47,7 +47,7 @@ func (c ContextStoreImpl) Import(documents []ldcontext.Document) error {
 	}
 
 	if err = save(c.store, contexts); err != nil {
-		return fmt.Errorf("save context documents failed, err = %v", err)
+		return fmt.Errorf("save context documents failed, err = %w", err)
 	}
 
 	return nil
@@ -61,12 +61,12 @@ func (c ContextStoreImpl) Delete(documents []ldcontext.Document) error {
 func computeContextHashes(store spistorage.Store) (map[string]string, error) {
 	iter, err := store.Query(ContextRecordTag)
 	if err != nil {
-		return nil, fmt.Errorf("query store: %v", err)
+		return nil, fmt.Errorf("query store: %w", err)
 	}
 	defer func() {
 		err = iter.Close()
 		if err != nil {
-			log.Printf("failed to close the iter: %v", err)
+			log.Printf("failed to close the iter: %w", err)
 		}
 	}()
 
@@ -101,7 +101,7 @@ func computeHash(v []byte) string {
 func getRemoteDocumentBytes(doc ldcontext.Document) ([]byte, error) {
 	document, err := jsonld.DocumentFromReader(bytes.NewReader(doc.Content))
 	if err != nil {
-		return nil, fmt.Errorf("document from reader: %v", err)
+		return nil, fmt.Errorf("document from reader: %w", err)
 	}
 
 	rdoc := jsonld.RemoteDocument{
@@ -111,7 +111,7 @@ func getRemoteDocumentBytes(doc ldcontext.Document) ([]byte, error) {
 
 	b, err := json.Marshal(rdoc)
 	if err != nil {
-		return nil, fmt.Errorf("marshal remote document: %v", err)
+		return nil, fmt.Errorf("marshal remote document: %w", err)
 	}
 
 	return b, nil
@@ -121,12 +121,12 @@ func save(store spistorage.Store, contexts []ldcontext.Document) error {
 	for _, c := range contexts {
 		b, err := getRemoteDocumentBytes(c)
 		if err != nil {
-			return fmt.Errorf("get remote document bytes: %v", err)
+			return fmt.Errorf("get remote document bytes: %w", err)
 		}
 
 		err = store.Put(c.URL, b, spistorage.Tag{Name: ContextRecordTag})
 		if err != nil {
-			return fmt.Errorf("put context: %v", err)
+			return fmt.Errorf("put context: %w", err)
 		}
 	}
 

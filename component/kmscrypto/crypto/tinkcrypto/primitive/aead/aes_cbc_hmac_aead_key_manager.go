@@ -116,7 +116,7 @@ func (km *aesCBCHMACAEADKeyManager) NewKey(serializedKeyFormat []byte) (proto.Me
 	}
 
 	if err := km.validateKeyFormat(keyFormat); err != nil {
-		return nil, fmt.Errorf("aes_cbc_hmac_aead_key_manager: invalid key format: %v", err)
+		return nil, fmt.Errorf("aes_cbc_hmac_aead_key_manager: invalid key format: %w", err)
 	}
 
 	return &aeadpb.AesCbcHmacAeadKey{

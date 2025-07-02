@@ -30,7 +30,7 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 		// 反序列化 JSON 对象
 		x25519KID, err := createX25519KID(keyBytes)
 		if err != nil {
-			return "", fmt.Errorf("createKID: %v", err)
+			return "", fmt.Errorf("createKID: %w", err)
 		}
 
 		return x25519KID, nil
@@ -38,7 +38,7 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 	case spikms.BLS12381G2Type:
 		bbsKID, err := createBLS12381G2KID(keyBytes)
 		if err != nil {
-			return "", fmt.Errorf("createKID: %v", err)
+			return "", fmt.Errorf("createKID: %w", err)
 		}
 
 		return bbsKID, nil
@@ -46,7 +46,7 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 	case spikms.ECDSASecp256k1TypeDER, spikms.ECDSASecp256k1TypeIEEEP1363:
 		secp256k1KID, err := secp256k1Thumbprint(keyBytes, kt)
 		if err != nil {
-			return "", fmt.Errorf("createKID: %v", err)
+			return "", fmt.Errorf("createKID: %w", err)
 		}
 
 		return secp256k1KID, nil
@@ -55,12 +55,12 @@ func CreateKID(keyBytes []byte, kt spikms.KeyType) (string, error) {
 	// 从字节数组中提取公钥
 	j, err := BuildJWK(keyBytes, kt)
 	if err != nil {
-		return "", fmt.Errorf("createKID: failed to build jwk: %v", err)
+		return "", fmt.Errorf("createKID: failed to build jwk: %w", err)
 	}
 
 	tp, err := j.Thumbprint(crypto.SHA256)
 	if err != nil {
-		return "", fmt.Errorf("createKID: failed to get jwk thumbprint: %v", err)
+		return "", fmt.Errorf("createKID: failed to get jwk thumbprint: %w", err)
 	}
 
 	return base64.RawURLEncoding.EncodeToString(tp), nil
@@ -85,13 +85,13 @@ func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 		spikms.ECDSAP521TypeDER, spikms.ECDSASecp256k1DER:
 		j, err = generateJWKFromDERECDSA(keyBytes)
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: faild to build JWK from ecdsa DER key: %v", err)
+			return nil, fmt.Errorf("buildJWK: faild to build JWK from ecdsa DER key: %w", err)
 		}
 
 	case spikms.ED25519Type:
 		j, err = jwksupport.JWKFromKey(ed25519.PublicKey(keyBytes))
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: faild to build JWK from key: %v", err)
+			return nil, fmt.Errorf("buildJWK: faild to build JWK from key: %w", err)
 		}
 
 	case spikms.ECDSAP256TypeIEEEP1363, spikms.ECDSAP384IEEEP1363,
@@ -107,24 +107,24 @@ func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 
 		j, err = jwksupport.JWKFromKey(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: failed to build JWK from ecdsa key in IEEE1363 format: %v", err)
+			return nil, fmt.Errorf("buildJWK: failed to build JWK from ecdsa key in IEEE1363 format: %w", err)
 		}
 
 	case spikms.NISTP256ECDHKWType, spikms.NISTP384ECDHKWType, spikms.NISTP521ECDHKWType:
 		j, err = generateJWKFromECDH(keyBytes)
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: failed to build JWK from ecdh key, err = %v", err)
+			return nil, fmt.Errorf("buildJWK: failed to build JWK from ecdh key, err = %w", err)
 		}
 
 	case spikms.X25519ECDHKWType:
 		pubKey, err := unmarshalECDHKey(keyBytes)
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: failed to unmarshal public key from X25519 key, err = %v", err)
+			return nil, fmt.Errorf("buildJWK: failed to unmarshal public key from X25519 key, err = %w", err)
 		}
 
 		j, err = jwksupport.JWKFromX25519Key(pubKey.X)
 		if err != nil {
-			return nil, fmt.Errorf("buildJWK: failed to build JWK from X25519 key, err = %v", err)
+			return nil, fmt.Errorf("buildJWK: failed to build JWK from X25519 key, err = %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("buildJWK: %w: `%s`", errInvalidKeyType, kt)
@@ -136,7 +136,7 @@ func BuildJWK(keyBytes []byte, kt spikms.KeyType) (*jwk.JWK, error) {
 func generateJWKFromDERECDSA(keyBytes []byte) (*jwk.JWK, error) {
 	pubKey, err := x509.ParsePKIXPublicKey(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("generateJWKFromDERECDSA: failed to parse ecdsa key in DER format: %v", err)
+		return nil, fmt.Errorf("generateJWKFromDERECDSA: failed to parse ecdsa key in DER format: %w", err)
 	}
 
 	return jwksupport.JWKFromKey(pubKey)
@@ -145,12 +145,12 @@ func generateJWKFromDERECDSA(keyBytes []byte) (*jwk.JWK, error) {
 func generateJWKFromECDH(keyBytes []byte) (*jwk.JWK, error) {
 	compositeKey, err := unmarshalECDHKey(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("generateJWKFromECDH: unmarshalECDHKey failed, err = %v", err)
+		return nil, fmt.Errorf("generateJWKFromECDH: unmarshalECDHKey failed, err = %w", err)
 	}
 
 	c, err := hybrid.GetCurve(compositeKey.Curve)
 	if err != nil {
-		return nil, fmt.Errorf("generateJWKFromECDH: get Curve for ECDH key failed, err = %v", err)
+		return nil, fmt.Errorf("generateJWKFromECDH: get Curve for ECDH key failed, err = %w", err)
 	}
 
 	pubKey := &ecdsa.PublicKey{

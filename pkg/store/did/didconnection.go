@@ -29,7 +29,7 @@ func (c *ConnectionStoreImpl) SaveDID(did string, keys ...string) error {
 	for _, key := range keys {
 		err := c.saveDID(did, key)
 		if err != nil {
-			return fmt.Errorf("saving DID in did map: %v", err)
+			return fmt.Errorf("saving DID in did map: %w", err)
 		}
 	}
 

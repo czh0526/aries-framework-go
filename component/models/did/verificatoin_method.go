@@ -24,7 +24,7 @@ func (vm *VerificationMethod) JSONWebKey() *jwk.JWK {
 func NewVerificationMethodFromJWK(id, keyType, controller string, j *jwk.JWK) (*VerificationMethod, error) {
 	pkBytes, err := j.PublicKeyBytes()
 	if err != nil {
-		return nil, fmt.Errorf("convert JWK to public key bytes failed, err = %v", err)
+		return nil, fmt.Errorf("convert JWK to public key bytes failed, err = %w", err)
 	}
 
 	relativeURL := false
