@@ -34,14 +34,14 @@ func (km *secp256k1VerifierKeyManager) Primitive(serializedKey []byte) (any, err
 	}
 
 	if err := km.validateKey(key); err != nil {
-		return nil, fmt.Errorf("secp256k1_verifier_key_manager: %v", err)
+		return nil, fmt.Errorf("secp256k1_verifier_key_manager: %w", err)
 	}
 
 	hash, curve, encoding := getSecp256K1ParamNames(key.Params)
 
 	ret, err := subtle.NewSecp256K1Verifier(hash, curve, encoding, key.X, key.Y)
 	if err != nil {
-		return nil, fmt.Errorf("secp256k1_verifier_key_manager: invalid key: %v", err)
+		return nil, fmt.Errorf("secp256k1_verifier_key_manager: invalid key: %w", err)
 	}
 	return ret, nil
 }
@@ -64,7 +64,7 @@ func (km *secp256k1VerifierKeyManager) TypeURL() string {
 
 func (km *secp256k1VerifierKeyManager) validateKey(key *secp256k1pb.Secp256K1PublicKey) error {
 	if err := keyset.ValidateKeyVersion(key.Version, secp256k1VerifierKeyVersion); err != nil {
-		return fmt.Errorf("secp256k1_verifier_key_manager: %v", err)
+		return fmt.Errorf("secp256k1_verifier_key_manager: %w", err)
 	}
 
 	hash, curve, encoding := getSecp256K1ParamNames(key.Params)

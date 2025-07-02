@@ -50,7 +50,7 @@ func New(opts ...Option) (*Aries, error) {
 	for _, option := range opts {
 		err := option(aries)
 		if err != nil {
-			return nil, fmt.Errorf("option initialization failed: %v", err)
+			return nil, fmt.Errorf("option initialization failed: %w", err)
 		}
 	}
 
@@ -60,7 +60,7 @@ func New(opts ...Option) (*Aries, error) {
 	// 设置 store provider
 	err := defFrameworkOpts(aries)
 	if err != nil {
-		return nil, fmt.Errorf("default option initialization failed: %v", err)
+		return nil, fmt.Errorf("default option initialization failed: %w", err)
 	}
 
 	return initializeServices(aries)
@@ -116,7 +116,7 @@ func createKMS(aries *Aries) error {
 
 	aries.kms, err = aries.kmsCreator(kmsProv)
 	if err != nil {
-		return fmt.Errorf("create KMS failed: %v", err)
+		return fmt.Errorf("create KMS failed: %w", err)
 	}
 
 	return nil
@@ -130,7 +130,7 @@ func createVDR(aries *Aries) error {
 		context.WithServiceEndpoint(serviceEndpoint(aries)),
 	)
 	if err != nil {
-		return fmt.Errorf("create context failed: %v", err)
+		return fmt.Errorf("create context failed: %w", err)
 	}
 
 	var vdrOpts []vdr.Option
@@ -141,7 +141,7 @@ func createVDR(aries *Aries) error {
 	// 将 did:peer:xxxxx 注册进 VDRegistry
 	p, err := peer.New(ctx.StorageProvider())
 	if err != nil {
-		return fmt.Errorf("create new vdr peer failed: %v", err)
+		return fmt.Errorf("create new vdr peer failed: %w", err)
 	}
 
 	dst := vdrapi.DIDCommServiceType
@@ -174,7 +174,7 @@ func createJSONLDContextStore(aries *Aries) error {
 
 	s, err := ldstore.NewContextStore(aries.storeProvider)
 	if err != nil {
-		return fmt.Errorf("init JSON-LD remote context store failed, err = %v", err)
+		return fmt.Errorf("init JSON-LD remote context store failed, err = %w", err)
 	}
 
 	aries.contextStore = s
@@ -188,7 +188,7 @@ func createJSONLDRemoteProviderStore(aries *Aries) error {
 
 	s, err := ldstore.NewRemoteProviderStore(aries.storeProvider)
 	if err != nil {
-		return fmt.Errorf("init JSON-LD remote provider store failed, err = %v", err)
+		return fmt.Errorf("init JSON-LD remote provider store failed, err = %w", err)
 	}
 
 	aries.remoteProviderStore = s
@@ -205,12 +205,12 @@ func createJSONLDDocumentLoader(aries *Aries) error {
 		context.WithJSONLDRemoteProviderStore(aries.remoteProviderStore),
 	)
 	if err != nil {
-		return fmt.Errorf("init JSON-LD document loader failed, err = %v", err)
+		return fmt.Errorf("init JSON-LD document loader failed, err = %w", err)
 	}
 
 	documentLoader, err := documentloader.NewDocumentLoader(ctx)
 	if err != nil {
-		return fmt.Errorf("init JSON-LD document loader failed, err = %v", err)
+		return fmt.Errorf("init JSON-LD document loader failed, err = %w", err)
 	}
 
 	aries.documentLoader = documentLoader

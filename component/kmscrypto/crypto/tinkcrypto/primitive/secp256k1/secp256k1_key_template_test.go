@@ -47,7 +47,7 @@ func TestKeyTemplate(t *testing.T) {
 func testSignVerify(kh *keyset.Handle) error {
 	signer, err := tinksignature.NewSigner(kh)
 	if err != nil {
-		return fmt.Errorf("signature.NewSigner() failed: %v", err)
+		return fmt.Errorf("signature.NewSigner() failed: %w", err)
 	}
 
 	testInputs := []struct {
@@ -79,7 +79,7 @@ func testSignVerify(kh *keyset.Handle) error {
 	for _, ti := range testInputs {
 		sig, err := signer.Sign(ti.message1)
 		if err != nil {
-			return fmt.Errorf("signer.Sign(ti.message1) failed: %v", err)
+			return fmt.Errorf("signer.Sign(ti.message1) failed: %w", err)
 		}
 		fmt.Printf("sig: %x \n", sig)
 	}

@@ -22,7 +22,7 @@ func secp256k1Thumbprint(keyBytes []byte, kt spikms.KeyType) (string, error) {
 
 	j, err := BuildJWK(keyBytes, kt)
 	if err != nil {
-		return "", fmt.Errorf("secp256k1Thumbprint: failed to build jwk: %v", err)
+		return "", fmt.Errorf("secp256k1Thumbprint: failed to build jwk: %w", err)
 	}
 
 	var input string
@@ -30,13 +30,13 @@ func secp256k1Thumbprint(keyBytes []byte, kt spikms.KeyType) (string, error) {
 	case *ecdsa.PublicKey:
 		input, err = secp256k1ThumbprintInput(key.Curve, key.X, key.Y)
 		if err != nil {
-			return "", fmt.Errorf("secp256k1Thumbprint: failed to get public key thumbprint input: %v", err)
+			return "", fmt.Errorf("secp256k1Thumbprint: failed to get public key thumbprint input: %w", err)
 		}
 
 	case *ecdsa.PrivateKey:
 		input, err = secp256k1ThumbprintInput(key.Curve, key.X, key.Y)
 		if err != nil {
-			return "", fmt.Errorf("secp256k1Thumbprint: failed to get private key thumbprint input: %v", err)
+			return "", fmt.Errorf("secp256k1Thumbprint: failed to get private key thumbprint input: %w", err)
 		}
 	default:
 		return "", fmt.Errorf("secp256k1Thumbprint: unknown key type: %T", key)

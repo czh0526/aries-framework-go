@@ -39,12 +39,12 @@ func (d *DIDDocResolver) Resolve(kid string) (*spicrypto.PublicKey, error) {
 
 	i := strings.Index(kid, "#")
 	if i < 0 {
-		return nil, fmt.Errorf("didDocResolver: kid is not KeyAgreement.ID: '%v'", kid)
+		return nil, fmt.Errorf("didDocResolver: kid is not KeyAgreement.ID: '%w'", kid)
 	}
 
 	didDoc, err := d.VDRRegistry.Resolve(kid[:i])
 	if err != nil {
-		return nil, fmt.Errorf("didDocResolver: for recipient DID doc resolution: err = %v", err)
+		return nil, fmt.Errorf("didDocResolver: for recipient DID doc resolution: err = %w", err)
 	}
 
 	for _, ka := range didDoc.DIDDocument.KeyAgreement {
@@ -74,12 +74,12 @@ func extractKey(ka *did.Verification) (*spicrypto.PublicKey, error) {
 	case x25519KeyAgreementKey2019:
 		pubKey, err = buildX25519Key(ka)
 		if err != nil {
-			return nil, fmt.Errorf("didDocResolver: %v", err)
+			return nil, fmt.Errorf("didDocResolver: %w", err)
 		}
 	case jsonWebKey2020:
 		pubKey, err = buildJWKKey(ka)
 		if err != nil {
-			return nil, fmt.Errorf("didDocResolver: %v", err)
+			return nil, fmt.Errorf("didDocResolver: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("didDocResolver: can't build key from KeyAgreement with type: `%v`",
@@ -98,12 +98,12 @@ func buildX25519Key(ka *did.Verification) (*spicrypto.PublicKey, error) {
 
 	mPubKey, err := json.Marshal(pubKey)
 	if err != nil {
-		return nil, fmt.Errorf("buildX25519: marshal key error: %v", err)
+		return nil, fmt.Errorf("buildX25519: marshal key error: %w", err)
 	}
 
 	x25519KMSKID, err := jwkkid.CreateKID(mPubKey, spikms.X25519ECDHKWType)
 	if err != nil {
-		return nil, fmt.Errorf("buildX25519: createKID error: %v", err)
+		return nil, fmt.Errorf("buildX25519: createKID error: %w", err)
 	}
 
 	pubKey.KID = x25519KMSKID
@@ -149,12 +149,12 @@ func buildJWKKey(ka *did.Verification) (*spicrypto.PublicKey, error) {
 
 	mPubKey, err := json.Marshal(pubKey)
 	if err != nil {
-		return nil, fmt.Errorf("buildJWKKey: marshal key error: %v", err)
+		return nil, fmt.Errorf("buildJWKKey: marshal key error: %w", err)
 	}
 
 	jwkKMSKID, err := jwkkid.CreateKID(mPubKey, kt)
 	if err != nil {
-		return nil, fmt.Errorf("buildJWKKey: createKID error: %v", err)
+		return nil, fmt.Errorf("buildJWKKey: createKID error: %w", err)
 	}
 
 	pubKey.KID = jwkKMSKID

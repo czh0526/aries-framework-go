@@ -29,13 +29,13 @@ func (j *JWK) UnmarshalJSON(jwkBytes []byte) error {
 
 	marshalErr := json.Unmarshal(jwkBytes, &key)
 	if marshalErr != nil {
-		return fmt.Errorf("unable to read JWK: %v", marshalErr)
+		return fmt.Errorf("unable to read JWK: %w", marshalErr)
 	}
 
 	if isSecp256k1(key.Alg, key.Kty, key.Crv) {
 		jwk, err := unmarshalSecp256k1(&key)
 		if err != nil {
-			return fmt.Errorf("unable to read JWK: %v", err)
+			return fmt.Errorf("unable to read JWK: %w", err)
 		}
 
 		*j = *jwk
@@ -43,7 +43,7 @@ func (j *JWK) UnmarshalJSON(jwkBytes []byte) error {
 	} else if isBLS12381G2(key.Kty, key.Crv) {
 		jwk, err := unmarshalBLS112381G2(&key)
 		if err != nil {
-			return fmt.Errorf("unable to read BBS+ JWE: %v", err)
+			return fmt.Errorf("unable to read BBS+ JWE: %w", err)
 		}
 
 		*j = *jwk
@@ -51,7 +51,7 @@ func (j *JWK) UnmarshalJSON(jwkBytes []byte) error {
 	} else if isX25519(key.Kty, key.Crv) {
 		jwk, err := unmarshalX25519(&key)
 		if err != nil {
-			return fmt.Errorf("unable to read X25519 JWE: %v", err)
+			return fmt.Errorf("unable to read X25519 JWE: %w", err)
 		}
 
 		*j = *jwk
@@ -61,7 +61,7 @@ func (j *JWK) UnmarshalJSON(jwkBytes []byte) error {
 		var joseJWK jose.JSONWebKey
 		err := json.Unmarshal(jwkBytes, &joseJWK)
 		if err != nil {
-			return fmt.Errorf("unable to read jose JWK, %v", err)
+			return fmt.Errorf("unable to read jose JWK, %w", err)
 		}
 
 		j.JSONWebKey = joseJWK

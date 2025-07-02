@@ -25,7 +25,7 @@ func PublicKeyBytesToHandle(pubKey []byte, kt spikms.KeyType, opts ...spikms.Key
 
 	marshalledKey, tURL, err := getMarshalledProtoKeyAndKeyURL(pubKey, kt, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("error getting marshalled proto key: %v", err)
+		return nil, fmt.Errorf("error getting marshalled proto key: %w", err)
 	}
 
 	ks := newKeySet(tURL, marshalledKey, tinkpb.KeyData_ASYMMETRIC_PUBLIC)
@@ -33,7 +33,7 @@ func PublicKeyBytesToHandle(pubKey []byte, kt spikms.KeyType, opts ...spikms.Key
 	memReader := &keyset.MemReaderWriter{Keyset: ks}
 	parsedHandle, err := insecurecleartextkeyset.Read(memReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create key handle: %v", err)
+		return nil, fmt.Errorf("failed to create key handle: %w", err)
 	}
 
 	return parsedHandle, nil

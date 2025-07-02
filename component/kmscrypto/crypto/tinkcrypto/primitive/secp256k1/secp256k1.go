@@ -7,9 +7,9 @@ import (
 
 func init() {
 	if err := registry.RegisterKeyManager(newSecp256K2SignerKeyManager()); err != nil {
-		panic(fmt.Sprintf("secp256k1 signer init() failed, err = %v", err))
+		panic(fmt.Sprintf("secp256k1 signer init() failed, err = %w", err))
 	}
 	if err := registry.RegisterKeyManager(newSecp256K1VerifierKeyManager()); err != nil {
-		panic(fmt.Sprintf("secp256k1 verify init() failed, err = %v", err))
+		panic(fmt.Sprintf("secp256k1 verify init() failed, err = %w", err))
 	}
 }

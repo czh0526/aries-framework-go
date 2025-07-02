@@ -29,12 +29,12 @@ func JWKFromKey(opaqueKey interface{}) (*jwk.JWK, error) {
 	// marshal/unmarshal to get all JWK's fields other than Key filled.
 	keyBytes, err := key.MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("create JWK: %v", err)
+		return nil, fmt.Errorf("create JWK: %w", err)
 	}
 
 	err = key.UnmarshalJSON(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("create JWK: %v", err)
+		return nil, fmt.Errorf("create JWK: %w", err)
 	}
 
 	return key, nil
@@ -51,12 +51,12 @@ func JWKFromX25519Key(pubKey []byte) (*jwk.JWK, error) {
 
 	keyBytes, err := key.MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("create JWK failed: err = %v", err)
+		return nil, fmt.Errorf("create JWK failed: err = %w", err)
 	}
 
 	err = key.UnmarshalJSON(keyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("create JWK failed, err = %v", err)
+		return nil, fmt.Errorf("create JWK failed, err = %w", err)
 	}
 
 	return key, nil

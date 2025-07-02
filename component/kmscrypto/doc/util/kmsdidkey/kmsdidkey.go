@@ -36,7 +36,7 @@ func BuildDIDKeyByKeyType(pubKeyBytes []byte, keyType spikms.KeyType) (string, e
 		pubKey := &spicrypto.PublicKey{}
 		err := json.Unmarshal(pubKeyBytes, pubKey)
 		if err != nil {
-			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %v", keyType, err)
+			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %w", keyType, err)
 		}
 
 		pubKeyBytes = make([]byte, len(pubKey.X))
@@ -46,12 +46,12 @@ func BuildDIDKeyByKeyType(pubKeyBytes []byte, keyType spikms.KeyType) (string, e
 		pubKey := &spicrypto.PublicKey{}
 		err := json.Unmarshal(pubKeyBytes, pubKey)
 		if err != nil {
-			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %v", keyType, err)
+			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %w", keyType, err)
 		}
 
 		ecKey, err := comp_crypto.ToECKey(pubKey)
 		if err != nil {
-			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %v", keyType, err)
+			return "", fmt.Errorf("buildDIDKeyByKMSKeyType unmarshal key failed, type = %v, err = %w", keyType, err)
 		}
 
 		pubKeyBytes = elliptic.MarshalCompressed(ecKey.Curve, ecKey.X, ecKey.Y)
@@ -73,7 +73,7 @@ func BuildDIDKeyByKeyType(pubKeyBytes []byte, keyType spikms.KeyType) (string, e
 func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 	pubKey, code, err := extractRawKey(didKey)
 	if err != nil {
-		return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
+		return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %w", err)
 	}
 
 	var (
@@ -97,7 +97,7 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 
 		edKID, err = jwkkid.CreateKID(pubKey, kmtKT)
 		if err != nil {
-			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
+			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %w", err)
 		}
 
 		pubEDKey.KID = edKID
@@ -118,12 +118,12 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 
 		mPubXKey, err = json.Marshal(pubXKey)
 		if err != nil {
-			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
+			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %w", err)
 		}
 
 		xKID, err = jwkkid.CreateKID(mPubXKey, kmtKT)
 		if err != nil {
-			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %v", err)
+			return nil, fmt.Errorf("encryptionPubKeyFromDIDKey: %w", err)
 		}
 
 		pubXKey.KID = xKID
@@ -150,7 +150,7 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 
 	kid, err := jwkkid.CreateKID(pubKey, kmtKT)
 	if err != nil {
-		return nil, fmt.Errorf("encryptionPubKeyFromDIDKey failed: err = %v", err)
+		return nil, fmt.Errorf("encryptionPubKeyFromDIDKey failed: err = %w", err)
 	}
 
 	return &spicrypto.PublicKey{
@@ -166,12 +166,12 @@ func EncryptionPubKeyFromDIDKey(didKey string) (*spicrypto.PublicKey, error) {
 func extractRawKey(didKey string) ([]byte, uint64, error) {
 	idMethodSpecificID, err := fingerprint.MethodIDFromDIDKey(didKey)
 	if err != nil {
-		return nil, 0, fmt.Errorf("extractRawKey: fingerprint.MethodIDFromDIDKey failure: %v", err)
+		return nil, 0, fmt.Errorf("extractRawKey: fingerprint.MethodIDFromDIDKey failure: %w", err)
 	}
 
 	pubKey, code, err := fingerprint.PubKeyFromFingerprint(idMethodSpecificID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("extractRawKey: fingerprint.PubKeyFromFingerprint failure: %v", err)
+		return nil, 0, fmt.Errorf("extractRawKey: fingerprint.PubKeyFromFingerprint failure: %w", err)
 	}
 
 	return pubKey, code, nil

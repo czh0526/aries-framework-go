@@ -22,7 +22,7 @@ type Packer struct {
 func New(ctx packer.Provider, encAlg comp_jose.EncAlg) (*Packer, error) {
 	err := validateEncAlg(encAlg)
 	if err != nil {
-		return nil, fmt.Errorf("authcrypt: %v", err)
+		return nil, fmt.Errorf("authcrypt: %w", err)
 	}
 
 	k := ctx.KMS()

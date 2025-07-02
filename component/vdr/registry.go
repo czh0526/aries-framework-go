@@ -77,7 +77,7 @@ func (r *Registry) Resolve(did string, opts ...spivdr.DIDMethodOption) (*modeldi
 		if errors.Is(err, vdrapi.ErrNotFound) {
 			return nil, err
 		}
-		return nil, fmt.Errorf("did method read failed, err = %v", err)
+		return nil, fmt.Errorf("did method read failed, err = %w", err)
 	}
 
 	return didDocResolution, nil
@@ -135,7 +135,7 @@ func (r *Registry) Deactivate(did string, opts ...spivdr.DIDMethodOption) error 
 func (r *Registry) Close() error {
 	for _, v := range r.vdr {
 		if err := v.Close(); err != nil {
-			return fmt.Errorf("close vdr: %v", err)
+			return fmt.Errorf("close vdr: %w", err)
 		}
 	}
 	return nil
@@ -169,7 +169,7 @@ func GetDidMethod(didID string) (string, error) {
 
 	didParts := strings.Split(didID, ":")
 	if len(didParts) < numPartsDID {
-		return "", fmt.Errorf("wrong format did input: %v", didID)
+		return "", fmt.Errorf("wrong format did input: %w", didID)
 	}
 
 	return didParts[1], nil

@@ -13,12 +13,12 @@ import (
 func createX25519KID(marshalledKey []byte) (string, error) {
 	compositeKey, err := unmarshalECDHKey(marshalledKey)
 	if err != nil {
-		return "", fmt.Errorf("createX25519KID: %v", err)
+		return "", fmt.Errorf("createX25519KID: %w", err)
 	}
 
 	j, err := buildX25519JWK(compositeKey.X)
 	if err != nil {
-		return "", fmt.Errorf("createX25519KID: %v", err)
+		return "", fmt.Errorf("createX25519KID: %w", err)
 	}
 
 	thumbprint := sha256Sum(j)
@@ -49,7 +49,7 @@ func unmarshalECDHKey(keyBytes []byte) (*spicrypto.PublicKey, error) {
 
 	err := json.Unmarshal(keyBytes, compositeKey)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalECDHKey: failed to unmarshal ECDH Key: %v", err)
+		return nil, fmt.Errorf("unmarshalECDHKey: failed to unmarshal ECDH Key: %w", err)
 	}
 
 	return compositeKey, nil

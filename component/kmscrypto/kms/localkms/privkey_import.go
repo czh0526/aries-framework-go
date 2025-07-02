@@ -36,12 +36,12 @@ func (l *LocalKMS) importEd25519Key(privKey ed25519.PrivateKey,
 
 	privKeyProto, err := newProtoEd25519PrivateKey(privKey)
 	if err != nil {
-		return "", nil, fmt.Errorf("import private ED25519 key failed: %v", err)
+		return "", nil, fmt.Errorf("import private ED25519 key failed: %w", err)
 	}
 
 	mKeyValue, err := proto.Marshal(privKeyProto)
 	if err != nil {
-		return "", nil, fmt.Errorf("import private ED25519 key failed: %v", err)
+		return "", nil, fmt.Errorf("import private ED25519 key failed: %w", err)
 	}
 
 	ks := newKeySet(ed25519SignerTypeURL, mKeyValue, tinkpb.KeyData_ASYMMETRIC_PRIVATE)
@@ -55,7 +55,7 @@ func (l *LocalKMS) importECDSAKey(privKey *ecdsa.PrivateKey,
 
 	err := validECPrivateKey(privKey)
 	if err != nil {
-		return "", nil, fmt.Errorf("import private EC key failed: %v", err)
+		return "", nil, fmt.Errorf("import private EC key failed: %w", err)
 	}
 
 	switch kt {
@@ -118,7 +118,7 @@ func (l *LocalKMS) importECDSAKey(privKey *ecdsa.PrivateKey,
 
 	mKeyValue, err := getMarshalledECDSAPrivateKey(privKey, params)
 	if err != nil {
-		return "", nil, fmt.Errorf("import private EC key failed: %v", err)
+		return "", nil, fmt.Errorf("import private EC key failed: %w", err)
 	}
 
 	ks := newKeySet(ecdsaSignerTypeURL, mKeyValue, tinkpb.KeyData_ASYMMETRIC_PRIVATE)
@@ -173,7 +173,7 @@ func (l *LocalKMS) importSecp256K1Key(privKey *ecdsa.PrivateKey, params *secp256
 
 	mKeyValue, err := getMarshalledECDSASecp256K1PrivateKey(privKey, params)
 	if err != nil {
-		return "", nil, fmt.Errorf("import private EC secp256k1 key failed: %v", err)
+		return "", nil, fmt.Errorf("import private EC secp256k1 key failed: %w", err)
 	}
 
 	ks := newKeySet(ecdsaSignerTypeURL, mKeyValue, tinkpb.KeyData_ASYMMETRIC_PRIVATE)
@@ -183,12 +183,12 @@ func (l *LocalKMS) importSecp256K1Key(privKey *ecdsa.PrivateKey, params *secp256
 func (l *LocalKMS) importKeySet(ks *tinkpb.Keyset, opts ...spikms.PrivateKeyOpts) (string, *keyset.Handle, error) {
 	ksID, err := l.writeImportedKey(ks, opts...)
 	if err != nil {
-		return "", nil, fmt.Errorf("import private EC key failed: %v", err)
+		return "", nil, fmt.Errorf("import private EC key failed: %w", err)
 	}
 
 	kh, err := l.getKeySet(ksID)
 	if err != nil {
-		return ksID, nil, fmt.Errorf("import private EC key successful but failed to get key from store: %v", err)
+		return ksID, nil, fmt.Errorf("import private EC key successful but failed to get key from store: %w", err)
 	}
 
 	return ksID, kh, nil

@@ -44,17 +44,17 @@ func (p *Packager) PackMessage(envelope *transport.Envelope) ([]byte, error) {
 
 	cty, pack, err := p.getCTYAndPacker(envelope)
 	if err != nil {
-		return nil, fmt.Errorf("packMessage: %v", err)
+		return nil, fmt.Errorf("packMessage: %w", err)
 	}
 
 	senderKey, recipients, err := p.prepareSenderAndRecipientKeys(cty, envelope)
 	if err != nil {
-		return nil, fmt.Errorf("packMessage: %v", err)
+		return nil, fmt.Errorf("packMessage: %w", err)
 	}
 
 	marshalledEnvelope, err := pack.Pack(cty, envelope.Message, senderKey, recipients)
 	if err != nil {
-		return nil, fmt.Errorf("packMessage: failed to pack: %v", err)
+		return nil, fmt.Errorf("packMessage: failed to pack: %w", err)
 	}
 
 	return marshalledEnvelope, nil
@@ -160,7 +160,7 @@ func (p *Packager) prepareSenderAndRecipientKeys(cty string, envelope *transport
 	case strings.Index(string(envelope.FromKey), "#") > 0:
 		senderKey, err := p.resolveKeyAgreementFromDIDDoc(string(envelope.FromKey))
 		if err != nil {
-			return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: for sender: %v", err)
+			return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: for sender: %w", err)
 		}
 
 		if isLegacy {
@@ -168,12 +168,12 @@ func (p *Packager) prepareSenderAndRecipientKeys(cty string, envelope *transport
 		} else {
 			marshalledSenderKey, err := json.Marshal(senderKey)
 			if err != nil {
-				return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: marshal sender key: %v", err)
+				return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: marshal sender key: %w", err)
 			}
 
 			senderKMSKID, err := jwkkid.CreateKID(marshalledSenderKey, getKMSKeyType(senderKey.Type, senderKey.Curve))
 			if err != nil {
-				return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: for sender KMS KID: %v", err)
+				return nil, nil, fmt.Errorf("prepareSenderAndRecipientKeys: for sender KMS KID: %w", err)
 			}
 
 			senderKey.KID = senderKMSKID
@@ -190,7 +190,7 @@ func (p *Packager) prepareSenderAndRecipientKeys(cty string, envelope *transport
 func addDIDKeyToRecipients(i int, receiverKey string, isLegacy bool) ([]byte, error) {
 	recKey, err := kmsdidkey.EncryptionPubKeyFromDIDKey(receiverKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key bytes from did:key verKey for recipient %d: %v", i+1, err)
+		return nil, fmt.Errorf("failed to parse public key bytes from did:key verKey for recipient %d: %w", i+1, err)
 	}
 
 	if isLegacy {
@@ -200,7 +200,7 @@ func addDIDKeyToRecipients(i int, receiverKey string, isLegacy bool) ([]byte, er
 	recKey.KID = receiverKey
 	marshalledKey, err := json.Marshal(recKey)
 	if err != nil {
-		return nil, fmt.Errorf("prepareSenderAndRecipientKeys: for recipient %d did:key: marshal: %v", i+1, err)
+		return nil, fmt.Errorf("prepareSenderAndRecipientKeys: for recipient %d did:key: marshal: %w", i+1, err)
 	}
 
 	return marshalledKey, nil
@@ -214,7 +214,7 @@ func (p *Packager) resolveKeyAgreementFromDIDDoc(keyAgrID string) (*spicrypto.Pu
 
 	docResolution, err := p.vdrRegistry.Resolve(keyAgrDID)
 	if err != nil {
-		return nil, fmt.Errorf("reolveKeyAgreementFromDIDDoc: for recipient DID doc resolution %v", err)
+		return nil, fmt.Errorf("reolveKeyAgreementFromDIDDoc: for recipient DID doc resolution %w", err)
 	}
 
 	for j, ka := range docResolution.DIDDocument.KeyAgreement {
@@ -251,7 +251,7 @@ func marshalKeyFromVerificationMethod(keyAgrID string, vm *did.VerificationMetho
 		jwkKey := vm.JSONWebKey()
 		recKey, err = jwksupport.PublicKeyFromJWK(jwkKey)
 		if err != nil {
-			return nil, fmt.Errorf("resolveKeyAgreementFromDIDDoc: for recipient JWK to PubKey %d: %v", i+1, err)
+			return nil, fmt.Errorf("resolveKeyAgreementFromDIDDoc: for recipient JWK to PubKey %d: %w", i+1, err)
 		}
 
 		recKey.KID = keyAgrID
