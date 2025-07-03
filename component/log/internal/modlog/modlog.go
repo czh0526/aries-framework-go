@@ -16,32 +16,26 @@ type ModLog struct {
 	module string
 }
 
-func (m ModLog) Panicf(msg string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func (m *ModLog) Panicf(msg string, args ...interface{}) {
+	m.logger.Panicf(msg, args...)
 }
 
-func (m ModLog) Fatalf(msg string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func (m *ModLog) Fatalf(msg string, args ...interface{}) {
+	m.logger.Fatalf(msg, args...)
 }
 
-func (m ModLog) Errorf(msg string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func (m *ModLog) Errorf(msg string, args ...interface{}) {
+	m.logger.Errorf(msg, args...)
 }
 
-func (m ModLog) Warnf(msg string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func (m *ModLog) Warnf(msg string, args ...interface{}) {
+	m.logger.Warnf(msg, args...)
 }
 
-func (m ModLog) Infof(msg string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func (m *ModLog) Infof(msg string, args ...interface{}) {
+	m.logger.Infof(msg, args...)
 }
 
-func (m ModLog) Debugf(msg string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func (m *ModLog) Debugf(msg string, args ...interface{}) {
+	m.logger.Debugf(msg, args...)
 }

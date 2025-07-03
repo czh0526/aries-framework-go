@@ -16,7 +16,31 @@ type Log struct {
 	once     sync.Once
 }
 
-func New(module string) *Log {
+func (l *Log) Panicf(msg string, args ...interface{}) {
+	l.logger().Panicf(msg, args...)
+}
+
+func (l *Log) Fatalf(msg string, args ...interface{}) {
+	l.logger().Fatalf(msg, args...)
+}
+
+func (l *Log) Errorf(msg string, args ...interface{}) {
+	l.logger().Errorf(msg, args...)
+}
+
+func (l *Log) Warnf(msg string, args ...interface{}) {
+	l.logger().Warnf(msg, args...)
+}
+
+func (l *Log) Infof(msg string, args ...interface{}) {
+	l.logger().Infof(msg, args...)
+}
+
+func (l *Log) Debugf(msg string, args ...interface{}) {
+	l.logger().Debugf(msg, args...)
+}
+
+func New(module string) spilog.Logger {
 	return &Log{
 		module: module,
 	}

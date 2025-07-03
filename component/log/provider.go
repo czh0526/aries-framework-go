@@ -17,6 +17,16 @@ func Initialize(l spilog.LoggerProvider) {
 	})
 }
 
+func loggerProvider() spilog.LoggerProvider {
+	loggerProviderOnce.Do(func() {
+		loggerProviderInstance = &modlogProvider{}
+		logger := loggerProviderInstance.GetLogger(loggerModule)
+		logger.Debugf(loggerNotInitializedMsg)
+	})
+
+	return loggerProviderInstance
+}
+
 type modlogProvider struct {
 	custom spilog.LoggerProvider
 }
