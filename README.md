@@ -14,16 +14,23 @@ keyset ------------------------------------> KeyHandle
 tink-package -------------------------> Primitive 
 
 
+    keyset.NewManager()                      keyset.NewHandle(kt)
+    ----------                                       --------------- KeyTemplate  <---------- KeyType
+             |             预定义模版                 ｜               
+             |                                      ｜
+             |            km.Handle()               ｜    
+             |         ---------------------->      ｜
+        keyset.Manager                         keyset.Handle
+             |         <----------------------      |
+             |      NewManagerFromHandle(kh)        |
+             |                                      |
+             |______________     ___________________|
+                           |     |
+                        tinkpb.Keyset
 
-     keyset.Manager           keyset.Handle
-             \                   /
-              \                 /
-               \               /
-                 tinkpb.Keyset
 
 
-    KeyType ------------> KeyTemplate
-     类型常量               预定义模版
+
 
 
 

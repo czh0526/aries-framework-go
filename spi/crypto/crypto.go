@@ -1,9 +1,9 @@
 package crypto
 
 type Crypto interface {
-	Encrypt(msg, aad []byte, kh interface{}) ([]byte, []byte, error)
+	Encrypt(msg, aad []byte, kh interface{}) ([]byte, error)
 
-	Decrypt(cipher, aad, nonce []byte, kh interface{}) ([]byte, error)
+	Decrypt(cipher, aad []byte, kh interface{}) ([]byte, error)
 
 	Sign(msg []byte, kh interface{}) ([]byte, error)
 
