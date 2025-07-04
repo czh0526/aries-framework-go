@@ -4,9 +4,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
+	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms/internal/keywrapper"
 	mocksecretlock "github.com/czh0526/aries-framework-go/component/kmscrypto/mock/secretlock"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/local"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/local/masterlock/hkdf"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -209,17 +213,39 @@ func TestNewKMS(t *testing.T) {
 func TestEncryptRotateDecrypt_Success(t *testing.T) {
 	sl := createMasterKeyAndSecretLock(t)
 
-	kmsService, err := New(testMasterKeyURI, &mockProvider{
+	localKms, err := New(testMasterKeyURI, &mockProvider{
 		storage:    newInMemoryKMSStore(),
 		secretLock: sl,
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, kmsService)
+	require.NotEmpty(t, localKms)
+
+	keyTemplates := []spikms.KeyType{
+		spikms.AES128GCMType,
+		spikms.AES256GCMNoPrefixType,
+		spikms.AES256GCMType,
+		spikms.ChaCha20Poly1305Type,
+		spikms.XChaCha20Poly1305Type,
+	}
+
+	for _, v := range keyTemplates {
+		keyID, keyHandle, e := localKms.Create(v)
+		require.NoError(t, e, "failed on template %v", v)
+		require.NotEmpty(t, keyHandle)
+		require.NotEmpty(t, keyID)
+
+		c := tinkcrypto.Crypto{}
+		msg := []byte("Test Rotation Message")
+		aad := []byte("some additional data")
+
+		cipherText, nonce, e := c.Encrypt(msg, aad, keyHandle)
+	}
 }
 
-func createMasterKeyAndSecretLock(t *testing.T) *mockProvider {
+func createMasterKeyAndSecretLock(t *testing.T) spisecretlock.Service {
 	t.Helper()
 
+	// 生成文件
 	masterKeyFilePath := "masterKey_file.txt"
 	tmpfile, err := ioutil.TempFile("", masterKeyFilePath)
 	require.NoError(t, err)
@@ -229,26 +255,43 @@ func createMasterKeyAndSecretLock(t *testing.T) *mockProvider {
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}()
 
+	// 随机数
 	masterKeyContent := random.GetRandomBytes(uint32(32))
 	require.NotEmpty(t, masterKeyContent)
 
+	// 生成 salt
 	passphrase := "secretPassphrase"
 	keySize := sha256.Size
 	salt := make([]byte, keySize)
 	_, err = rand.Read(salt)
-	require.NotEmpty(t, err)
+	require.NoError(t, err)
 
+	// 创建一个 MasterLock
 	masterLocker, err := hkdf.NewMasterLock(passphrase, sha256.New, salt)
 	require.NoError(t, err)
 	require.NotEmpty(t, masterLocker)
 
+	// 数据加密
 	masterLockEnc, err := masterLocker.Encrypt("", &spisecretlock.EncryptRequest{
 		Plaintext: string(masterKeyContent),
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, masterLockEnc)
 
+	// 将`加密数据`写入文件
 	n, err := tmpfile.Write([]byte(masterLockEnc.Ciphertext))
 	require.NoError(t, err)
 	require.Equal(t, len(masterLockEnc.Ciphertext), n)
+
+	// 读取`加密数据`
+	r, err := local.MasterKeyFromPath(tmpfile.Name())
+	require.NoError(t, err)
+	require.NotEmpty(t, r)
+
+	// 构建一个 secretLock
+	s, err := local.NewService(r, masterLocker)
+	require.NoError(t, err)
+	require.NotEmpty(t, s)
+
+	return s
 }

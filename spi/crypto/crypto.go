@@ -1,6 +1,13 @@
 package crypto
 
 type Crypto interface {
+	Encrypt(msg, aad []byte, kh interface{}) ([]byte, []byte, error)
+
+	Decrypt(cipher, aad, nonce []byte, kh interface{}) ([]byte, error)
+
+	Sign(msg []byte, kh interface{}) ([]byte, error)
+
+	Verify(signature, msg []byte, kh interface{}) error
 }
 
 type PublicKey struct {

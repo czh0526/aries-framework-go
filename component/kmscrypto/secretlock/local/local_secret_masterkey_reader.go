@@ -1,6 +1,8 @@
 package local
 
 import (
+	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,4 +20,16 @@ func MasterKeyFromPath(path string) (io.Reader, error) {
 			logger.Warnf("failed to close master key file: %v", err)
 		}
 	}()
+
+	mkData := make([]byte, masterKeyLen)
+
+	n, err := io.ReadFull(masterKeyFile, mkData)
+	if err != nil {
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, err
+		}
+	}
+
+	mkData = mkData[0:n]
+	return bytes.NewReader(mkData), nil
 }
