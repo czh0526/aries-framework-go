@@ -3,6 +3,7 @@ module github.com/czh0526/aries-framework-go/component/models
 go 1.23.7
 
 require (
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20250704101502-9a775bcd4677
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/piprate/json-gold v0.5.0
@@ -34,4 +35,5 @@ require (
 
 replace (
 	github.com/czh0526/aries-framework-go/spi => ../../spi
+	github.com/czh0526/aries-framework-go/component/kmscrypto => ../kmscrypto
 )
