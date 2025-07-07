@@ -65,6 +65,46 @@ func (l *LocalKMS) Get(keyID string) (interface{}, error) {
 	return l.getKeySet(keyID)
 }
 
+func (l *LocalKMS) Rotate(kt spikms.KeyType, keyID string, opts ...spikms.KeyOpts) (string, interface{}, error) {
+	kh, err := l.getKeySet(keyID)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to getKeySet: %w", err)
+	}
+
+	keyTemplate, err := getKeyTemplate(kt, opts...)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to getKeyTemplate: %w", err)
+	}
+
+	km := keyset.NewManagerFromHandle(kh)
+	newKeyId, err := km.Add(keyTemplate)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to add new key: %w", err)
+	}
+
+	err = km.SetPrimary(newKeyId)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to set primary key: %w", err)
+	}
+
+	updatedKH, err := km.Handle()
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to get updated key handle: %w", err)
+	}
+
+	err = l.store.Delete(keyID)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to delete keyset: %w", err)
+	}
+
+	newID, err := l.storeKeySet(updatedKH, kt)
+	if err != nil {
+		return "", nil, fmt.Errorf("rotate: failed to store keyset: %w", err)
+	}
+
+	return newID, updatedKH, nil
+}
+
 func (l *LocalKMS) ExportPubKeyBytes(id string) ([]byte, spikms.KeyType, error) {
 	// 根据 id 获取 Keyset Handle
 	kh, err := l.getKeySet(id)

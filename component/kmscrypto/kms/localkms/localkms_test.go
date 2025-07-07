@@ -238,7 +238,69 @@ func TestEncryptRotateDecrypt_Success(t *testing.T) {
 		msg := []byte("Test Rotation Message")
 		aad := []byte("some additional data")
 
-		cipherText, nonce, e := c.Encrypt(msg, aad, keyHandle)
+		cipherText, e := c.Encrypt(msg, aad, keyHandle)
+		require.NoError(t, e)
+
+		newKeyID, rotatedKeyHandle, e := localKms.Rotate(v, keyID)
+		require.NoError(t, e)
+		require.NotEmpty(t, rotatedKeyHandle)
+		require.NotEqual(t, newKeyID, keyID)
+
+		decryptedMsg, e := c.Decrypt(cipherText, aad, rotatedKeyHandle)
+		require.NoError(t, e)
+		require.Equal(t, msg, decryptedMsg)
+	}
+}
+
+func TestLocalKMS_Success(t *testing.T) {
+	sl := createMasterKeyAndSecretLock(t)
+
+	keys := make(map[string][]byte)
+	testStore := newInMemoryKMSStore()
+
+	testStore.keys = keys
+
+	localKms, err := New(testMasterKeyURI, &mockProvider{
+		storage:    testStore,
+		secretLock: sl,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, localKms)
+
+	keyTemplate := []spikms.KeyType{
+		//spikms.AES128GCMType,
+		//spikms.AES256GCMNoPrefixType,
+		//spikms.AES256GCMType,
+		//spikms.ChaCha20Poly1305Type,
+		//spikms.XChaCha20Poly1305Type,
+		//spikms.ECDSAP256TypeDER,
+		//spikms.ECDSAP384TypeDER,
+		//spikms.ECDSAP521TypeDER,
+		//spikms.ECDSAP256TypeIEEEP1363,
+		//spikms.ECDSAP384TypeIEEEP1363,
+		//spikms.ECDSAP521TypeIEEEP1363,
+		//spikms.ECDSAP384TypeIEEEP1363,
+		//spikms.ED25519Type,
+		spikms.NISTP256ECDHKWType,
+		spikms.NISTP384ECDHKWType,
+		spikms.NISTP521ECDHKWType,
+		spikms.X25519ECDHKWType,
+		spikms.BLS12381G2Type,
+		//spikms.ECDSASecp256k1TypeDER,
+		spikms.ECDSASecp256k1TypeIEEEP1363,
+	}
+
+	for _, v := range keyTemplate {
+		if v == spikms.ECDSASecp256k1TypeDER {
+			_, _, e := localKms.Create(v)
+			require.EqualError(t, e, "create: Unable to create kms key: Secp256K1 is not supported by DER format")
+			continue
+		}
+
+		keyID, newKeyHandle, e := localKms.Create(v)
+		require.NoError(t, e)
+		require.NotEmpty(t, newKeyHandle)
+		require.NotEmpty(t, keyID)
 	}
 }
 

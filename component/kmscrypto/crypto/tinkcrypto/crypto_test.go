@@ -8,6 +8,7 @@ import (
 	tinkaead "github.com/tink-crypto/tink-go/v2/aead"
 	tinkaeadsubtle "github.com/tink-crypto/tink-go/v2/aead/subtle"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"testing"
@@ -154,6 +155,23 @@ func TestCrypto_SignVerify(t *testing.T) {
 		require.NoError(t, err)
 
 		err = c.Verify(sig, msg, pubKH)
+		require.NoError(t, err)
+	})
+}
+
+func TestCrypto_ComputeVerifyMAC(t *testing.T) {
+	t.Run("test with compute MAC", func(t *testing.T) {
+		kh, err := keyset.NewHandle(mac.HMACSHA256Tag256KeyTemplate())
+		require.NoError(t, err)
+		require.NotNil(t, kh)
+
+		c := Crypto{}
+		msg := []byte(testMessage)
+		macBytes, err := c.ComputeMAC(msg, kh)
+		require.NoError(t, err)
+		require.NotEmpty(t, macBytes)
+
+		err = c.VerifyMAC(macBytes, msg, kh)
 		require.NoError(t, err)
 	})
 }

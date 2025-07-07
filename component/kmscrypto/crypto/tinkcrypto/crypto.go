@@ -6,6 +6,7 @@ import (
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	"github.com/tink-crypto/tink-go/v2/aead"
 	"github.com/tink-crypto/tink-go/v2/keyset"
+	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/signature"
 	"log"
 )
@@ -15,7 +16,7 @@ var errBadKeyHandleFormat = errors.New("bad key handle format")
 type Crypto struct {
 }
 
-func (c Crypto) Encrypt(msg, aad []byte, kh interface{}) ([]byte, error) {
+func (c *Crypto) Encrypt(msg, aad []byte, kh interface{}) ([]byte, error) {
 	keyHandle, ok := kh.(*keyset.Handle)
 	if !ok {
 		return nil, errBadKeyHandleFormat
@@ -34,7 +35,7 @@ func (c Crypto) Encrypt(msg, aad []byte, kh interface{}) ([]byte, error) {
 	return ct, nil
 }
 
-func (c Crypto) Decrypt(cipher, aad []byte, kh interface{}) ([]byte, error) {
+func (c *Crypto) Decrypt(cipher, aad []byte, kh interface{}) ([]byte, error) {
 	keyHandle, ok := kh.(*keyset.Handle)
 	if !ok {
 		return nil, errBadKeyHandleFormat
@@ -53,7 +54,7 @@ func (c Crypto) Decrypt(cipher, aad []byte, kh interface{}) ([]byte, error) {
 	return pt, nil
 }
 
-func (c Crypto) Sign(msg []byte, kh interface{}) ([]byte, error) {
+func (c *Crypto) Sign(msg []byte, kh interface{}) ([]byte, error) {
 	keyHandle, ok := kh.(*keyset.Handle)
 	if !ok {
 		return nil, errBadKeyHandleFormat
@@ -72,7 +73,7 @@ func (c Crypto) Sign(msg []byte, kh interface{}) ([]byte, error) {
 	return sig, nil
 }
 
-func (c Crypto) Verify(sig, msg []byte, kh interface{}) error {
+func (c *Crypto) Verify(sig, msg []byte, kh interface{}) error {
 	keyHandle, ok := kh.(*keyset.Handle)
 	if !ok {
 		return errBadKeyHandleFormat
@@ -89,6 +90,34 @@ func (c Crypto) Verify(sig, msg []byte, kh interface{}) error {
 	}
 
 	return err
+}
+
+func (c *Crypto) ComputeMAC(data []byte, kh interface{}) ([]byte, error) {
+	keyHandle, ok := kh.(*keyset.Handle)
+	if !ok {
+		return nil, errBadKeyHandleFormat
+	}
+
+	macPrimitive, err := mac.New(keyHandle)
+	if err != nil {
+		return nil, err
+	}
+
+	return macPrimitive.ComputeMAC(data)
+}
+
+func (c *Crypto) VerifyMAC(macBytes, data []byte, kh interface{}) error {
+	keyHandle, ok := kh.(*keyset.Handle)
+	if !ok {
+		return errBadKeyHandleFormat
+	}
+
+	macPrimitive, err := mac.New(keyHandle)
+	if err != nil {
+		return err
+	}
+
+	return macPrimitive.VerifyMAC(macBytes, data)
 }
 
 var _ spicrypto.Crypto = (*Crypto)(nil)

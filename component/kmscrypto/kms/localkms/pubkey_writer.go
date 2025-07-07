@@ -170,7 +170,7 @@ func getMarshalledECDSAKeyValueFromProto(pubKeyProto *ecdsapb.EcdsaPublicKey) ([
 		return nil, "", fmt.Errorf("undefined curve")
 	}
 
-	pubKey := &ecdsa.PublicKey{
+	pubKey := ecdsa.PublicKey{
 		Curve: curve,
 		X:     new(big.Int).SetBytes(pubKeyProto.X),
 		Y:     new(big.Int).SetBytes(pubKeyProto.Y),
