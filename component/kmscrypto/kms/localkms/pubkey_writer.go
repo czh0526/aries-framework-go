@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/x509"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/keyio"
 
 	secp256k1pb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/secp256k1_go_proto"
 	secp256k1subtle "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/secp256k1/subtle"
@@ -26,7 +27,7 @@ const (
 	x25519ECDHKWPublicKeyTypeURL = "type.hyperledger.org/hyperledger.aries.crypto.tink.X25519EcdhKwPublicKey"
 	bbsVerifierKeyTypeURL        = "type.hyperledger.org/hyperledger.aries.crypto.tink.BBSPublicKey"
 	clCredDefKeyTypeURL          = "type.hyperledger.org/hyperledger.aries.crypto.tink.CLCredDefKey"
-	secp256k1VerifierTypeURL     = "type.googleapis.com/google.crypto.tink.secp256k1PublicKey"
+	secp256k1VerifierTypeURL     = "type.hyperledger.org/hyperledger.aries.crypto.tink.Secp256k1VerifierKey"
 	derPrefix                    = "der-"
 	p1363Prefix                  = "p1363-"
 )
@@ -86,6 +87,18 @@ func write(w io.Writer, msg *tinkpb.Keyset) (spikms.KeyType, error) {
 				if err != nil {
 					return "", err
 				}
+
+			case nistPECDHKWPublicKeyTypeURL, x25519ECDHKWPublicKeyTypeURL:
+				pkW := keyio.NewWriter(w)
+
+				err = pkW.Write(msg)
+				if err != nil {
+					return "", err
+				}
+
+				kt = pkW.KeyType
+				created = true
+
 			default:
 				return "", fmt.Errorf("key type not supported for writing raw key bytes: %v", key.KeyData.TypeUrl)
 			}

@@ -47,7 +47,7 @@ func (l *LocalKMS) Create(kt spikms.KeyType, opts ...spikms.KeyOpts) (string, in
 		return "", nil, fmt.Errorf("failed to getKeyTemplate: %w", err)
 	}
 
-	// 通过 KeyTemplate 获取 KeyHandle
+	// 通过 KeyTemplate 创建对应的 KeyManager, 并获取 KeyManager 的 Handle
 	kh, err := keyset.NewHandle(keyTemplate)
 	if err != nil {
 		return "", nil, fmt.Errorf("create: failed to create new keyset handle: %w", err)

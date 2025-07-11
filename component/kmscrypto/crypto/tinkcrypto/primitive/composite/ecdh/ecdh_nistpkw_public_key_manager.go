@@ -16,29 +16,32 @@ var errInvalidNISPPECDHKWPublicKey = errors.New("invalid NIST P-ECDH public key"
 
 type nistPECDHKWPublicKeyManager struct{}
 
-func (n nistPECDHKWPublicKeyManager) Primitive(serializedKey []byte) (any, error) {
+func (n *nistPECDHKWPublicKeyManager) Primitive(serializedKey []byte) (any, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (n nistPECDHKWPublicKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
+func (n *nistPECDHKWPublicKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (n nistPECDHKWPublicKeyManager) DoesSupport(typeURL string) bool {
+func (n *nistPECDHKWPublicKeyManager) DoesSupport(typeURL string) bool {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (n nistPECDHKWPublicKeyManager) TypeURL() string {
-	//TODO implement me
-	panic("implement me")
+func (n *nistPECDHKWPublicKeyManager) TypeURL() string {
+	return nistpECDHKWPublicKeyTypeURL
 }
 
-func (n nistPECDHKWPublicKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
+func (n *nistPECDHKWPublicKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
 var _ registry.KeyManager = (*nistPECDHKWPublicKeyManager)(nil)
+
+func newECDHNISTPAESPublicKeyManager() *nistPECDHKWPublicKeyManager {
+	return new(nistPECDHKWPublicKeyManager)
+}

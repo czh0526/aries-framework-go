@@ -16,6 +16,7 @@ import (
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
 	"github.com/stretchr/testify/require"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"io/ioutil"
 	"os"
@@ -267,41 +268,63 @@ func TestLocalKMS_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, localKms)
 
-	keyTemplate := []spikms.KeyType{
-		//spikms.AES128GCMType,
-		//spikms.AES256GCMNoPrefixType,
-		//spikms.AES256GCMType,
-		//spikms.ChaCha20Poly1305Type,
-		//spikms.XChaCha20Poly1305Type,
-		//spikms.ECDSAP256TypeDER,
-		//spikms.ECDSAP384TypeDER,
-		//spikms.ECDSAP521TypeDER,
-		//spikms.ECDSAP256TypeIEEEP1363,
-		//spikms.ECDSAP384TypeIEEEP1363,
-		//spikms.ECDSAP521TypeIEEEP1363,
-		//spikms.ECDSAP384TypeIEEEP1363,
-		//spikms.ED25519Type,
+	keyTypes := []spikms.KeyType{
+		spikms.AES128GCMType,
+		spikms.AES256GCMNoPrefixType,
+		spikms.AES256GCMType,
+		spikms.ChaCha20Poly1305Type,
+		spikms.XChaCha20Poly1305Type,
+		spikms.ECDSAP256TypeDER,
+		spikms.ECDSAP384TypeDER,
+		spikms.ECDSAP521TypeDER,
+		spikms.ECDSAP256TypeIEEEP1363,
+		spikms.ECDSAP384TypeIEEEP1363,
+		spikms.ECDSAP521TypeIEEEP1363,
+		spikms.ECDSAP384TypeIEEEP1363,
+		spikms.ED25519Type,
 		spikms.NISTP256ECDHKWType,
 		spikms.NISTP384ECDHKWType,
 		spikms.NISTP521ECDHKWType,
 		spikms.X25519ECDHKWType,
-		spikms.BLS12381G2Type,
-		//spikms.ECDSASecp256k1TypeDER,
+		//spikms.BLS12381G2Type,
+		spikms.ECDSASecp256k1TypeDER,
 		spikms.ECDSASecp256k1TypeIEEEP1363,
 	}
 
-	for _, v := range keyTemplate {
-		if v == spikms.ECDSASecp256k1TypeDER {
-			_, _, e := localKms.Create(v)
+	for _, kt := range keyTypes {
+		if kt == spikms.ECDSASecp256k1TypeDER {
+			_, _, e := localKms.Create(kt)
 			require.EqualError(t, e, "create: Unable to create kms key: Secp256K1 is not supported by DER format")
 			continue
 		}
 
-		keyID, newKeyHandle, e := localKms.Create(v)
+		// 创建一个 KeySet， 返回 keyId + Handle
+		keyID, newKeyHandle, e := localKms.Create(kt)
 		require.NoError(t, e)
 		require.NotEmpty(t, newKeyHandle)
 		require.NotEmpty(t, keyID)
+
+		ks, ok := keys[keyID]
+		require.True(t, ok)
+		require.NotEmpty(t, ks)
+
+		newKeySetInfo := newKeyHandle.(*keyset.Handle).KeysetInfo()
+
+		loadedKeyHandle, e := localKms.Get(keyID)
+		require.NoError(t, e)
+		require.NotEmpty(t, loadedKeyHandle)
+
+		loadedKeySetInfo := loadedKeyHandle.(*keyset.Handle).KeysetInfo()
+		require.Equal(t, len(newKeySetInfo.KeyInfo), len(loadedKeySetInfo.KeyInfo))
 	}
+}
+
+// 测试通过 KeyType 获取 KeyTemplate
+func TestLocalKMS_getKeyTemplate(t *testing.T) {
+	keyTemplate, err := getKeyTemplate(spikms.HMACSHA256Tag256Type)
+	require.NoError(t, err)
+	require.NotEmpty(t, keyTemplate)
+	require.Equal(t, "type.googleapis.com/google.crypto.tink.HmacKey", keyTemplate.TypeUrl)
 }
 
 func createMasterKeyAndSecretLock(t *testing.T) spisecretlock.Service {

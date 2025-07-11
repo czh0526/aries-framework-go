@@ -12,6 +12,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
 	github.com/stretchr/testify v1.10.0
+	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8
 	github.com/tink-crypto/tink-go/v2 v2.4.0
 	golang.org/x/crypto v0.35.0
 	google.golang.org/protobuf v1.36.6

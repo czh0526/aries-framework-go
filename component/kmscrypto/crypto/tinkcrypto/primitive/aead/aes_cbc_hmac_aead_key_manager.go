@@ -1,11 +1,13 @@
 package aead
 
 import (
+	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/aead/subtle"
 	cbcpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/aes_cbc_go_proto"
 	aeadpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/aes_cbc_hmac_aead_go_proto"
 	subtleaead "github.com/tink-crypto/tink-go/v2/aead/subtle"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	subtlemac "github.com/tink-crypto/tink-go/v2/mac/subtle"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	hmacpb "github.com/tink-crypto/tink-go/v2/proto/hmac_go_proto"
@@ -66,7 +68,7 @@ func (km *aesCBCHMACAEADKeyManager) Primitive(serializedKey []byte) (any, error)
 	}
 
 	hmacKey := key.HmacKey
-	hmac, err := subtlemac.NewHMAC(hmacKey.Params.Hash.String(), key.AesCbcKey.KeyValue, hmacKey.Params.TagSize)
+	hmac, err := subtlemac.NewHMAC(hmacKey.Params.Hash.String(), hmacKey.KeyValue, hmacKey.Params.TagSize)
 	if err != nil {
 		return nil, fmt.Errorf("aes_cbc_hmac_aead_key_manager: cannot create hmac primitive: %s", err)
 	}
@@ -134,9 +136,54 @@ func (km *aesCBCHMACAEADKeyManager) NewKey(serializedKeyFormat []byte) (proto.Me
 }
 
 func (km *aesCBCHMACAEADKeyManager) validateKeyFormat(format *aeadpb.AesCbcHmacAeadKeyFormat) error {
+	// Validate AesCtrKeyFormat.
+	if err := subtle.ValidateAESKeySize(format.AesCbcKeyFormat.KeySize); err != nil {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: %w", err)
+	}
+
+	// Validate HmacKeyFormat.
+	hmacKeyFormat := format.HmacKeyFormat
+	if hmacKeyFormat.KeySize < minHMACKeySizeInBytes {
+		return errors.New("aes_cbc_hmac_aead_key_manager: HMAC KeySize is too small")
+	}
+
+	if hmacKeyFormat.Params.TagSize < minTagSizeInBytes {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: invalid HmacParams: TagSize %d is too small",
+			hmacKeyFormat.Params.TagSize)
+	}
+
+	tagSize, ok := maxTagSize[hmacKeyFormat.Params.Hash]
+	if !ok {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: invalid HmacParams: HashType %q not supported",
+			hmacKeyFormat.Params.Hash)
+	}
+
+	if hmacKeyFormat.Params.TagSize > tagSize {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: invalid HmacParams: TagSize %d is too big for HashType %q",
+			hmacKeyFormat.Params.TagSize, hmacKeyFormat.Params.Hash)
+	}
+
 	return nil
 }
 
 func (km *aesCBCHMACAEADKeyManager) validateKey(key *aeadpb.AesCbcHmacAeadKey) error {
+	if err := keyset.ValidateKeyVersion(key.Version, aesCBCHMACAEADKeyVersion); err != nil {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: %w", err)
+	}
+
+	if err := keyset.ValidateKeyVersion(key.AesCbcKey.Version, aesCBCHMACAEADKeyVersion); err != nil {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: %w", err)
+	}
+
+	if err := keyset.ValidateKeyVersion(key.HmacKey.Version, aesCBCHMACAEADKeyVersion); err != nil {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: %w", err)
+	}
+
+	// Validate AesCtrKey.
+	keySize := uint32(len(key.AesCbcKey.KeyValue))
+	if err := subtle.ValidateAESKeySize(keySize); err != nil {
+		return fmt.Errorf("aes_cbc_hmac_aead_key_manager: %w", err)
+	}
+
 	return nil
 }
