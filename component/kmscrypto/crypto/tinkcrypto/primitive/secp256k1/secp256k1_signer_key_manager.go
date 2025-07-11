@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	secp256k1pb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/secp256k1_go_proto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/secp256k1/subtle"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"google.golang.org/protobuf/proto"
@@ -122,11 +123,18 @@ func (km *secp256k1SignerKeyManager) PublicKeyData(serializedPrivKey []byte) (*t
 }
 
 func (km *secp256k1SignerKeyManager) validateKey(key *secp256k1pb.Secp256K1PrivateKey) error {
-	return nil
+	if err := keyset.ValidateKeyVersion(key.Version, secp256k1SignerKeyVersion); err != nil {
+		return fmt.Errorf("secp256k1_signer_key_manager: invalid key version: %w", err)
+	}
+
+	hash, curve, encoding := getSecp256K1ParamNames(key.PublicKey.Params)
+
+	return ValidateSecp256K1Params(hash, curve, encoding)
 }
 
 func (km *secp256k1SignerKeyManager) validateKeyFormat(format *secp256k1pb.Secp256K1KeyFormat) error {
-	return nil
+	hash, curve, encoding := getSecp256K1ParamNames(format.Params)
+	return ValidateSecp256K1Params(hash, curve, encoding)
 }
 
 func newSecp256K2SignerKeyManager() *secp256k1SignerKeyManager {
