@@ -5,6 +5,7 @@ import (
 	"fmt"
 	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 	"log"
 )
@@ -46,6 +47,8 @@ func (c *ConnectionStoreImpl) SaveDIDFromDoc(doc *didmodel.Doc) error {
 		log.Printf("saveDIDFromDoc: CreateDestination of DID Document returned error [%v], no keys will be "+
 			"linked for this DID `%s` in the connection store", err, doc.ID)
 	}
+
+	return c.SaveDID(doc.ID, keys...)
 }
 
 func (c *ConnectionStoreImpl) saveDID(did, key string) error {

@@ -327,6 +327,26 @@ func TestLocalKMS_getKeyTemplate(t *testing.T) {
 	require.Equal(t, "type.googleapis.com/google.crypto.tink.HmacKey", keyTemplate.TypeUrl)
 }
 
+func TestLocalKMS_GetKey(t *testing.T) {
+	t.Run("test Create() success And GetKey", func(t *testing.T) {
+		localKms, err := New(testMasterKeyURI, &mockProvider{
+			storage:    newInMemoryKMSStore(),
+			secretLock: &noop.NoLock{},
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, localKms)
+
+		id, kh, err := localKms.Create(spikms.AES128GCMType)
+		require.NoError(t, err)
+		require.NotEmpty(t, kh)
+		require.NotEmpty(t, id)
+
+		kh, err = localKms.Get(id)
+		require.NoError(t, err)
+		require.NotNil(t, kh)
+	})
+}
+
 func createMasterKeyAndSecretLock(t *testing.T) spisecretlock.Service {
 	t.Helper()
 

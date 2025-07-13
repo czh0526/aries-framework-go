@@ -8,12 +8,13 @@ import (
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/mac"
 	"github.com/tink-crypto/tink-go/v2/signature"
-	"log"
 )
 
 var errBadKeyHandleFormat = errors.New("bad key handle format")
 
 type Crypto struct {
+	//ecKW  keyWrapper
+	//okpKW keyWrapper
 }
 
 func (c *Crypto) Encrypt(msg, aad []byte, kh interface{}) ([]byte, error) {
@@ -123,6 +124,8 @@ func (c *Crypto) VerifyMAC(macBytes, data []byte, kh interface{}) error {
 var _ spicrypto.Crypto = (*Crypto)(nil)
 
 func New() (*Crypto, error) {
-	log.Printf("【default】New tink crypto")
-	return &Crypto{}, nil
+	return &Crypto{
+		//ecKW:  &ecKWSupport{},
+		//okpKW: &okpKWSupport{},
+	}, nil
 }
