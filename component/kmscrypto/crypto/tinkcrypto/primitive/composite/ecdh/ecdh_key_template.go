@@ -18,7 +18,7 @@ const (
 	AES128CBCHMACSHA256
 	AES192CBCHMACSHA384
 	AES256CBCHMACSHA384
-	AES256CBCHMACSHA521
+	AES256CBCHMACSHA512
 )
 
 func NISTP256ECDHKWKeyTemplate() *tinkpb.KeyTemplate {
@@ -39,6 +39,10 @@ func NISTP521ECDHKWKeyTemplate() *tinkpb.KeyTemplate {
 func X25519ECDHKWKeyTemplate() *tinkpb.KeyTemplate {
 	return createKeyTemplate(
 		false, XC20P, commonpb.EllipticCurveType_CURVE25519, nil)
+}
+
+func KeyTemplateForECDHPrimitiveWithCEK(cek []byte, nistpKW bool, encAlg AEADAlg) *tinkpb.KeyTemplate {
+	return createKeyTemplate(nistpKW, encAlg, 0, cek)
 }
 
 func createKeyTemplate(nistpKW bool, encAlg AEADAlg, c commonpb.EllipticCurveType, cek []byte) *tinkpb.KeyTemplate {
@@ -79,7 +83,7 @@ func getTypeParams(nistpKW bool, encAlg AEADAlg, cek []byte) (string, ecdhpb.Key
 	switch encAlg {
 	case AES256GCM:
 		keyTemplate = aead.AES256GCMKeyTemplate()
-	case AES128CBCHMACSHA256, AES192CBCHMACSHA384, AES256CBCHMACSHA384, AES256CBCHMACSHA521:
+	case AES128CBCHMACSHA256, AES192CBCHMACSHA384, AES256CBCHMACSHA384, AES256CBCHMACSHA512:
 		switch len(cek) {
 		case subtle.AES128Size * twoKeys:
 			keyTemplate = cbcaead.AES128CBCHMACSHA256KeyTemplate()

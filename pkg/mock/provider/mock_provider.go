@@ -1,9 +1,10 @@
 package provider
 
 import (
-	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
+	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/store/did"
+	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 )
@@ -19,5 +20,24 @@ type Provider struct {
 	DIDConnectionStoreValue           did.ConnectionStore
 	PackerList                        []packer.Packer
 	PackerValue                       packer.Packer
-	OutboundDispatcherValue           dispatcher.Outbound
+	CryptoValue                       spicrypto.Crypto
+	VDRegistryValue                   vdrapi.Registry
+	//OutboundDispatcherValue           dispatcher.Outbound
+
+}
+
+func (p *Provider) KMS() spikms.KeyManager {
+	return p.KMSValue
+}
+
+func (p *Provider) Crypto() spicrypto.Crypto {
+	return p.CryptoValue
+}
+
+func (p *Provider) StorageProvider() spistorage.Provider {
+	return p.StorageProviderValue
+}
+
+func (p *Provider) VDRegistry() vdrapi.Registry {
+	return p.VDRegistryValue
 }

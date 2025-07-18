@@ -31,6 +31,10 @@ type PubKeyWriter struct {
 	w       io.Writer
 }
 
+func (p *PubKeyWriter) WriteEncrypted(_ *tinkpb.EncryptedKeyset) error {
+	return fmt.Errorf("write encrypted function not supported")
+}
+
 func NewWriter(w io.Writer) *PubKeyWriter {
 	return &PubKeyWriter{
 		w: w,
