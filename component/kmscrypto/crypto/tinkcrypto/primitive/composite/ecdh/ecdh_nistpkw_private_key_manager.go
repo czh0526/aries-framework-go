@@ -4,9 +4,12 @@ import (
 	"crypto/elliptic"
 	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh/subtle"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
 	hybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"google.golang.org/protobuf/proto"
 )
@@ -24,8 +27,27 @@ var (
 type nistPECDHKWPrivateKeyManager struct{}
 
 func (km *nistPECDHKWPrivateKeyManager) Primitive(serializedKey []byte) (any, error) {
-	//TODO implement me
-	panic("implement me")
+	if len(serializedKey) == 0 {
+		return nil, errInvalidNISTPECDHKWPrivateKey
+	}
+
+	key := new(ecdhpb.EcdhAeadPrivateKey)
+	err := proto.Unmarshal(serializedKey, key)
+	if err != nil {
+		return nil, errInvalidNISTPECDHKWPrivateKey
+	}
+
+	_, err = km.validateKey(key)
+	if err != nil {
+		return nil, errInvalidX25519ECDHKWPrivateKey
+	}
+
+	rEnc, err := composite.NewRegisterCompositeAEADEncHelper(key.PublicKey.Params.EncParams.AeadEnc)
+	if err != nil {
+		return nil, fmt.Errorf("nistpkw_ecdh_private_key_manager: NewRegisterCompositeAEADEncHelper failed: %w", err)
+	}
+
+	return subtle.NewECDHAEADCompositeDecrypt(rEnc, key.PublicKey.Params.EncParams.CEK), nil
 }
 
 func (km *nistPECDHKWPrivateKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
@@ -125,6 +147,15 @@ func (km *nistPECDHKWPrivateKeyManager) PublicKeyData(serializedKey []byte) (*ti
 		Value:           serializedPubKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PUBLIC,
 	}, nil
+}
+
+func (km *nistPECDHKWPrivateKeyManager) validateKey(key *ecdhpb.EcdhAeadPrivateKey) (elliptic.Curve, error) {
+	err := keyset.ValidateKeyVersion(key.Version, nistpECDHKWPrivateKeyVersion)
+	if err != nil {
+		return nil, fmt.Errorf("nistpkw_ecdh_private_key_manager: invalid key: %w", err)
+	}
+
+	return validateKeyFormat(key.PublicKey.Params)
 }
 
 var _ registry.PrivateKeyManager = (*nistPECDHKWPrivateKeyManager)(nil)

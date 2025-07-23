@@ -42,3 +42,30 @@ var aeadAlg = map[EncAlg]ecdh.AEADAlg{
 }
 
 type Headers map[string]interface{}
+
+func (h Headers) Type() (string, bool) {
+	return h.stringValue(HeaderType)
+}
+
+func (h Headers) ContentType() (string, bool) {
+	return h.stringValue(HeaderContentType)
+}
+
+func (h Headers) KeyID() (string, bool) {
+	return h.stringValue(HeaderKeyID)
+}
+
+func (h Headers) Encryption() (string, bool) {
+	return h.stringValue(HeaderEncryption)
+}
+
+func (h Headers) stringValue(key string) (string, bool) {
+	raw, ok := h[key]
+	if !ok {
+		return "", false
+	}
+
+	str, ok := raw.(string)
+
+	return str, ok
+}

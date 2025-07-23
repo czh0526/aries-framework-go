@@ -3,6 +3,7 @@ package packager
 import (
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmsdidkey"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
@@ -85,7 +86,11 @@ func packUnpackSuccess(keyType spikms.KeyType, customKMS spikms.KeyManager, cryp
 		},
 	}
 
-	testPacker, err := authcrypt.New()
+	testPacker, err := authcrypt.New(mockedProviders, jose.A256CBCHS512)
+	require.NoError(t, err)
+
+	mockedProviders.primaryPacker = testPacker
+
 }
 
 type resolverFunc func(didID string, opts ...spivdr.DIDMethodOption) (*did.DocResolution, error)
@@ -176,14 +181,34 @@ type kmsProvider struct {
 	secretLockService spisecretlock.Service
 }
 
+func (k kmsProvider) StorageProvider() spikms.Store {
+	return k.kmsStore
+}
+
+func (k kmsProvider) SecretLock() spisecretlock.Service {
+	return k.secretLockService
+}
+
 type mockProvider struct {
-	storage       *spistorage.Provider
+	storage       spistorage.Provider
 	kms           spikms.KeyManager
 	secretLock    spisecretlock.Service
 	crypto        spicrypto.Crypto
 	packers       []packer.Packer
 	primaryPacker packer.Packer
 	vdr           vdrapi.Registry
+}
+
+func (m *mockProvider) KMS() spikms.KeyManager {
+	return m.kms
+}
+
+func (m *mockProvider) Crypto() spicrypto.Crypto {
+	return m.crypto
+}
+
+func (m *mockProvider) StorageProvider() spistorage.Provider {
+	return m.storage
 }
 
 func (m *mockProvider) PrimaryPacker() packer.Packer {
