@@ -1,6 +1,8 @@
 package ecdh
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	"github.com/stretchr/testify/require"
 	"github.com/tink-crypto/tink-go/v2/aead"
@@ -49,6 +51,28 @@ func TestECDHESFactory(t *testing.T) {
 
 	d, err := NewECDHDecrypt(khPriv)
 	require.NoError(t, err)
+
+	for i := 0; i < 4; i++ {
+		pt := random.GetRandomBytes(32)
+		aadRndNb := random.GetRandomBytes(10)
+
+		aadJSON, err := json.Marshal(aadRndNb)
+		require.NoError(t, err)
+
+		aad, err := json.Marshal(&map[string]interface{}{"someFiled": json.RawMessage(aadJSON)})
+		require.NoError(t, err)
+
+		aadStr := base64.StdEncoding.EncodeToString(aad)
+		aad = []byte(aadStr)
+
+		ct, err := e.Encrypt(pt, aad)
+		require.NoError(t, err)
+
+		gotpt, err := d.Decrypt(ct, aad)
+		require.NoError(t, err)
+
+		require.EqualValues(t, pt, gotpt)
+	}
 }
 
 func generateECDHAEADPrivateKey(t *testing.T, c commonpb.EllipticCurveType, ptfmt commonpb.EcPointFormat,

@@ -10,6 +10,15 @@ import (
 	"github.com/tink-crypto/tink-go/v2/signature"
 )
 
+const (
+	ECDHESA256KWAlg  = "ECDH-ES+A256KW"
+	ECDH1PUA128KWAlg = "ECDH-1PU+A128KW"
+	ECDH1PUA192KWAlg = "ECDH-1PU+A192KW"
+	ECDH1PUA256KWAlg = "ECDH-1PU+A256KW"
+	ECDHESXC20PKWAlg = "ECDH-ES+XC20PKW"
+	ECDH1PUXC20PWAlg = "ECDH-1PU+XC20PW"
+)
+
 var errBadKeyHandleFormat = errors.New("bad key handle format")
 
 type Crypto struct {

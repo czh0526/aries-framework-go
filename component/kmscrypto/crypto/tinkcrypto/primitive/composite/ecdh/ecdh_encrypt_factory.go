@@ -13,14 +13,22 @@ func NewECDHEncrypt(kh *keyset.Handle) (api.CompositeEncrypt, error) {
 }
 
 func NewECDHEncryptWithKeyManager(kh *keyset.Handle, km registry.KeyManager) (api.CompositeEncrypt, error) {
-	return aead.New(kh)
+	return &compositeEncrypt{
+		kh: kh,
+	}, nil
 }
 
-type encryptPrimitiveSet struct {
+type compositeEncrypt struct {
+	kh *keyset.Handle
 }
 
-func (e encryptPrimitiveSet) Encrypt(plaintext, aad []byte) ([]byte, error) {
-	return nil, fmt.Errorf("ecdh_encrypt_factory: not yet implemented")
+func (e *compositeEncrypt) Encrypt(plaintext, aad []byte) ([]byte, error) {
+	encrypter, err := aead.New(e.kh)
+	if err != nil {
+		return nil, fmt.Errorf("compositeEncrypt: cannot obtain encrypter: %s", err)
+	}
+
+	return encrypter.Encrypt(plaintext, aad)
 }
 
-var _ api.CompositeEncrypt = (*encryptPrimitiveSet)(nil)
+var _ api.CompositeEncrypt = (*compositeEncrypt)(nil)
