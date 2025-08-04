@@ -5,9 +5,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh/subtle"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/util/cryptoutil"
 	"github.com/tink-crypto/tink-go/v2/core/registry"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"google.golang.org/protobuf/proto"
@@ -46,8 +49,27 @@ func (km *x25519ECDHKWPrivateKeyManager) PublicKeyData(serializedKey []byte) (*t
 }
 
 func (km *x25519ECDHKWPrivateKeyManager) Primitive(serializedKey []byte) (any, error) {
-	//TODO implement me
-	panic("implement me")
+	if len(serializedKey) == 0 {
+		return nil, errInvalidX25519ECDHKWPrivateKey
+	}
+
+	key := new(ecdhpb.EcdhAeadPrivateKey)
+	err := proto.Unmarshal(serializedKey, key)
+	if err != nil {
+		return nil, errInvalidX25519ECDHKWPrivateKey
+	}
+
+	err = km.validateKey(key)
+	if err != nil {
+		return nil, errInvalidX25519ECDHKWPrivateKey
+	}
+
+	rEnc, err := composite.NewRegisterCompositeAEADEncHelper(key.PublicKey.Params.EncParams.AeadEnc)
+	if err != nil {
+		return nil, fmt.Errorf("x25519kw_ecdh_private_key_manager: NewRegisterCompositeAEADEncHelper %w", err)
+	}
+
+	return subtle.NewECDHAEADCompositeCrypto(rEnc, key.PublicKey.Params.EncParams.CEK), nil
 }
 
 func (km *x25519ECDHKWPrivateKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
@@ -129,6 +151,15 @@ func (km *x25519ECDHKWPrivateKeyManager) NewKeyData(serializedKeyFormat []byte) 
 		Value:           serializedKey,
 		KeyMaterialType: tinkpb.KeyData_ASYMMETRIC_PRIVATE,
 	}, nil
+}
+
+func (km *x25519ECDHKWPrivateKeyManager) validateKey(key *ecdhpb.EcdhAeadPrivateKey) error {
+	err := keyset.ValidateKeyVersion(key.Version, x25519ECDHKWPrivateKeyVersion)
+	if err != nil {
+		return fmt.Errorf("x25519kw_ecdh_private_key_manager: invalid key version: %w", err)
+	}
+
+	return validateKeyXChaChaFormat(key.PublicKey.Params)
 }
 
 var _ registry.PrivateKeyManager = (*x25519ECDHKWPrivateKeyManager)(nil)

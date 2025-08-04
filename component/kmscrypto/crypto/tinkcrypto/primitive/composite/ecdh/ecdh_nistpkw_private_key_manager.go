@@ -47,7 +47,7 @@ func (km *nistPECDHKWPrivateKeyManager) Primitive(serializedKey []byte) (any, er
 		return nil, fmt.Errorf("nistpkw_ecdh_private_key_manager: NewRegisterCompositeAEADEncHelper failed: %w", err)
 	}
 
-	return subtle.NewECDHAEADCompositeDecrypt(rEnc, key.PublicKey.Params.EncParams.CEK), nil
+	return subtle.NewECDHAEADCompositeCrypto(rEnc, key.PublicKey.Params.EncParams.CEK), nil
 }
 
 func (km *nistPECDHKWPrivateKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {

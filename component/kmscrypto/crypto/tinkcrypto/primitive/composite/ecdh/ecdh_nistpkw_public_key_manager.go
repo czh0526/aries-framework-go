@@ -44,12 +44,11 @@ func (km *nistPECDHKWPublicKeyManager) Primitive(serializedKey []byte) (any, err
 		return nil, fmt.Errorf("nistpkw_ecdh_public_key_manager: NewRegisterCompositeAEADHelper failed: %w", err)
 	}
 
-	return subtle.NewECDHAEADCompositeEncrypt(rEnc, ecdhPubKey.Params.EncParams.CEK), nil
+	return subtle.NewECDHAEADCompositeCrypto(rEnc, ecdhPubKey.Params.EncParams.CEK), nil
 }
 
 func (km *nistPECDHKWPublicKeyManager) NewKey(serializedKeyFormat []byte) (proto.Message, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, errors.New("nistpkw_ecdh_public_key_manager: NewKey not implemented")
 }
 
 func (km *nistPECDHKWPublicKeyManager) DoesSupport(typeURL string) bool {
@@ -62,8 +61,7 @@ func (km *nistPECDHKWPublicKeyManager) TypeURL() string {
 }
 
 func (km *nistPECDHKWPublicKeyManager) NewKeyData(serializedKeyFormat []byte) (*tinkpb.KeyData, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, errors.New("nistpkw_ecdh_public_key_manager: NewKeyData not implemented")
 }
 
 func (km *nistPECDHKWPublicKeyManager) validateKey(key *ecdhpb.EcdhAeadPublicKey) (elliptic.Curve, error) {

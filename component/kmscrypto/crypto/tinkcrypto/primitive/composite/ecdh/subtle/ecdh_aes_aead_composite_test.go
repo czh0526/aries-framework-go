@@ -18,16 +18,15 @@ func TestEncryptDecrypt(t *testing.T) {
 	require.NoError(t, err)
 
 	cek := random.GetRandomBytes(uint32(32))
-	cEnc := NewECDHAEADCompositeEncrypt(mEncHelper, cek)
+	enc := NewECDHAEADCompositeCrypto(mEncHelper, cek)
 
 	plaintext := []byte("secret message")
 	aad := []byte("aad message")
 
-	ciphertext, err := cEnc.Encrypt(plaintext, aad)
+	ciphertext, err := enc.Encrypt(plaintext, aad)
 	require.NoError(t, err)
 
-	dEnc := NewECDHAEADCompositeDecrypt(mEncHelper, cek)
-	dpt, err := dEnc.Decrypt(ciphertext, aad)
+	dpt, err := enc.Decrypt(ciphertext, aad)
 	require.NoError(t, err)
 	require.Equal(t, plaintext, dpt)
 }
