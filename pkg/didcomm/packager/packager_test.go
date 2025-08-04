@@ -16,6 +16,7 @@ import (
 	comp_mockvdr "github.com/czh0526/aries-framework-go/component/vdr/mock"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer/authcrypt"
+	legacy "github.com/czh0526/aries-framework-go/pkg/didcomm/packer/legacy/authcrypt"
 	mockdiddoc "github.com/czh0526/aries-framework-go/pkg/mock/diddoc"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -91,6 +92,8 @@ func packUnpackSuccess(keyType spikms.KeyType, customKMS spikms.KeyManager, cryp
 
 	mockedProviders.primaryPacker = testPacker
 
+	legacyPacker := legacy.New(mockedProviders)
+	mockedProviders.packers = []packer.Packer{testPacker, legacyPacker}
 }
 
 type resolverFunc func(didID string, opts ...spivdr.DIDMethodOption) (*did.DocResolution, error)
