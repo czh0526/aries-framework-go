@@ -8,6 +8,7 @@ import (
 )
 
 const Curve25519KeySize = 32
+const NonceSize = 24
 
 func PublicEd25519toCurve25519(pub []byte) ([]byte, error) {
 	if len(pub) == 0 {

@@ -127,11 +127,13 @@ func (l *LocalKMS) ExportPubKeyBytes(id string) ([]byte, spikms.KeyType, error) 
 }
 
 func (l *LocalKMS) CreateAndExportPubKeyBytes(kt spikms.KeyType, opts ...spikms.KeyOpts) (string, []byte, error) {
+	// 创建并保存 keyset
 	kid, _, err := l.Create(kt, opts...)
 	if err != nil {
 		return "", nil, fmt.Errorf("createAndExportPubKeyBytes: failed to create new key: %w", err)
 	}
 
+	// 导出 keyset 公钥
 	pubKeyBytes, _, err := l.ExportPubKeyBytes(kid)
 	if err != nil {
 		return "", nil, fmt.Errorf("createAndExportPubKeyBytes: failed to export new public key bytes: %w", err)

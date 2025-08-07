@@ -27,11 +27,18 @@ func New(ctx packer.Provider) *Packer {
 	}
 }
 
+type legacyEnvelope struct {
+	Protected  string `json:"protected,omitempty"`
+	IV         string `json:"iv,omitempty"`
+	CipherText string `json:"ciphertext,omitempty"`
+	Tag        string `json:"tag,omitempty"`
+}
+
 type protected struct {
-	Enc        string `json:"enc,omitempty"`
-	Typ        string `json:"typ,omitempty"`
-	Alg        string `json:"alg,omitempty"`
-	Recipients string `json:"recipients,omitempty"`
+	Enc        string      `json:"enc,omitempty"`
+	Typ        string      `json:"typ,omitempty"`
+	Alg        string      `json:"alg,omitempty"`
+	Recipients []recipient `json:"recipients,omitempty"`
 }
 
 type recipient struct {
