@@ -2,7 +2,6 @@ package jose
 
 import (
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/api"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh"
 	resolver "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/kidresolver"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
