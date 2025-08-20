@@ -1,8 +1,11 @@
 package tinkcrypto
 
 import (
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/aead"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/aead/subtle"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/keyio"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/secp256k1"
 	"github.com/stretchr/testify/require"
 	tinkaead "github.com/tink-crypto/tink-go/v2/aead"
@@ -11,6 +14,7 @@ import (
 	"github.com/tink-crypto/tink-go/v2/mac"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"github.com/tink-crypto/tink-go/v2/signature"
+	"github.com/tink-crypto/tink-go/v2/subtle/random"
 	"testing"
 )
 
@@ -174,4 +178,34 @@ func TestCrypto_ComputeVerifyMAC(t *testing.T) {
 		err = c.VerifyMAC(macBytes, msg, kh)
 		require.NoError(t, err)
 	})
+}
+
+func TestCrypto_ECDHES_Wrap_Unwrap_Key(t *testing.T) {
+	recipientKeyHandle, err := keyset.NewHandle(ecdh.NISTP256ECDHKWKeyTemplate())
+	require.NoError(t, err)
+
+	c, err := New()
+	require.NoError(t, err)
+
+	cek := random.GetRandomBytes(uint32(crypto.DefKeySize))
+	apu := random.GetRandomBytes(uint32(10))
+	apv := random.GetRandomBytes(uint32(10))
+
+	_, err = c.WrapKey(cek, apu, apv, nil)
+	require.EqualError(t, err, "wrapKey: recipient public key is required")
+
+	recipientKey, err := keyio.ExtractPrimaryPublicKey(recipientKeyHandle)
+	require.NoError(t, err)
+
+	wrappedKey, err := c.WrapKey(cek, apu, apv, recipientKey)
+	require.NoError(t, err)
+	require.NotEmpty(t, wrappedKey.EncryptedCEK)
+	require.NotEmpty(t, wrappedKey.EPK)
+	require.Equal(t, wrappedKey.APU, apu)
+	require.Equal(t, wrappedKey.APV, apv)
+	require.Equal(t, wrappedKey.Alg, ECDHESA256KWAlg)
+
+	uCEK, err := c.UnwrapKey(wrappedKey, recipientKeyHandle)
+	require.NoError(t, err)
+	require.Equal(t, cek, uCEK)
 }

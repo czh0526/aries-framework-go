@@ -9,15 +9,15 @@ import (
 
 func TestSingleThread(t *testing.T) {
 	t.Run("test task timeout", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancelFunc()
 
 		process(ctx)
 	})
 
 	t.Run("test task finish", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-		defer cancel()
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancelFunc()
 
 		process(ctx)
 	})

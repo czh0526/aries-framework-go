@@ -26,6 +26,34 @@ func (jd *JWEDecrypt) Decrypt(jwe *JSONWebEncryption) ([]byte, error) {
 	}
 
 	var wkOpts []spicrypto.WrapKeyOpts
+
+	skid, ok := jwe.ProtectedHeaders.SenderKeyID()
+}
+
+func (jd *JWEDecrypt) validateAndExtractProtectedHeaders(jwe *JSONWebEncryption) (string, error) {
+	if jwe == nil {
+		return "", fmt.Errorf("jwe is nil")
+	}
+
+	if len(jwe.ProtectedHeaders) == 0 {
+		return "", fmt.Errorf("jwe has no protected headers")
+	}
+
+	protectedHeaders := jwe.ProtectedHeaders
+
+	encAlg, ok := protectedHeaders.Encryption()
+	if !ok {
+		return "", fmt.Errorf("jwe is missing encryption algorithm 'enc' header")
+	}
+
+	switch encAlg {
+	case string(A256GCM), string(XC20P), string(A128CBCHS256),
+		string(A192CBCHS384), string(A256CBCHS384), string(A256CBCHS512):
+	default:
+		return "", fmt.Errorf("encryption algorithm '%s' not supported", encAlg)
+	}
+
+	return encAlg, nil
 }
 
 func (jd *JWEDecrypt) decryptJWE(jwe *JSONWebEncryption, cek []byte) ([]byte, error) {

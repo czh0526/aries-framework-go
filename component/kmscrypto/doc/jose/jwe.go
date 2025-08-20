@@ -14,6 +14,7 @@ const (
 
 var (
 	errWrongNumberOfCompactJWEParts = errors.New("invalid compact JWE: it must have five parts")
+	errEmptyCiphertext              = errors.New("ciphertext cannot be empty")
 )
 
 type RecipientHeaders struct {
@@ -40,6 +41,113 @@ type JSONWebEncryption struct {
 	IV                 string
 	Ciphertext         string
 	Tag                string
+}
+
+type marshalFunc func(interface{}) ([]byte, error)
+
+func (e *JSONWebEncryption) FullSerialize(marshal marshalFunc) (string, error) {
+	b64ProtectedHeaders, unprotectedHeaders, err := e.prepareHeaders(marshal)
+	if err != nil {
+		return "", err
+	}
+
+	recipientsJSON, b64SingleRecipientEncKey, singleRecipientHeader, err := e.prepareRecipients(marshal)
+	if err != nil {
+		return "", err
+	}
+
+	b64AAD := base64.RawURLEncoding.EncodeToString([]byte(e.AAD))
+
+	b64IV := base64.RawURLEncoding.EncodeToString([]byte(e.IV))
+
+	if e.Ciphertext == "" {
+		return "", errEmptyCiphertext
+	}
+
+	b64Ciphertext := base64.RawURLEncoding.EncodeToString([]byte(e.Ciphertext))
+
+	b64Tag := base64.RawURLEncoding.EncodeToString([]byte(e.Tag))
+
+	preparedJWE := rawJSONWebEncryption{
+		B64ProtectedHeaders:      b64ProtectedHeaders,
+		UnprotectedHeaders:       unprotectedHeaders,
+		Recipients:               recipientsJSON,
+		B64SingleRecipientEncKey: b64SingleRecipientEncKey,
+		SingleRecipientHeader:    singleRecipientHeader,
+		B64AAD:                   b64AAD,
+		B64IV:                    b64IV,
+		B64Ciphertext:            b64Ciphertext,
+		B64Tag:                   b64Tag,
+	}
+
+	serializedJWE, err := json.Marshal(preparedJWE)
+	if err != nil {
+		return "", err
+	}
+
+	return string(serializedJWE), nil
+}
+
+func (e *JSONWebEncryption) prepareHeaders(marshal marshalFunc) (string, json.RawMessage, error) {
+	var b64ProtectedHeaders string
+
+	if e.ProtectedHeaders != nil {
+		protectedHeadersJSON, err := marshal(e.ProtectedHeaders)
+		if err != nil {
+			return "", nil, err
+		}
+
+		b64ProtectedHeaders = base64.RawURLEncoding.EncodeToString(protectedHeadersJSON)
+	}
+
+	var unprotectedHeaders json.RawMessage
+	if e.UnprotectedHeaders != nil {
+		unprotectedHeadersJSON, err := marshal(e.UnprotectedHeaders)
+		if err != nil {
+			return "", nil, err
+		}
+
+		unprotectedHeaders = unprotectedHeadersJSON
+	}
+
+	return b64ProtectedHeaders, unprotectedHeaders, nil
+}
+
+func (e *JSONWebEncryption) prepareRecipients(marshal marshalFunc) (json.RawMessage, string, []byte, error) {
+	var recipientsJSON json.RawMessage
+	var b64SingleRecipientEncKey string
+	var singleRecipientHeader []byte
+
+	switch len(e.Recipients) {
+	case 0:
+		recipientsJSON = json.RawMessage(`[{}]`)
+	case 1:
+		b64SingleRecipientEncKey = base64.RawURLEncoding.EncodeToString([]byte(e.Recipients[0].EncryptedKey))
+
+		if e.Recipients[0].Header != nil {
+			var errMarshal error
+
+			singleRecipientHeader, errMarshal = marshal(e.Recipients[0].Header)
+			if errMarshal != nil {
+				return nil, "", nil, errMarshal
+			}
+		}
+	default:
+		recipientsToMarshal := make([]Recipient, len(e.Recipients))
+		for i, recipient := range e.Recipients {
+			recipientsToMarshal[i].EncryptedKey = base64.RawURLEncoding.EncodeToString([]byte(recipient.EncryptedKey))
+			recipientsToMarshal[i].Header = recipient.Header
+		}
+
+		nonEmptyRecipientsJSON, errMarshal := marshal(recipientsToMarshal)
+		if errMarshal != nil {
+			return nil, "", nil, errMarshal
+		}
+
+		recipientsJSON = nonEmptyRecipientsJSON
+	}
+
+	return recipientsJSON, b64SingleRecipientEncKey, singleRecipientHeader, nil
 }
 
 func Deserialize(serializedJWE string) (*JSONWebEncryption, error) {

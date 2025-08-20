@@ -23,3 +23,12 @@ type PrivateKey struct {
 	PublicKey PublicKey `json:"pubKey,omitempty"`
 	D         []byte    `json:"d,omitempty"`
 }
+
+type RecipientWrappedKey struct {
+	KID          string    `json:"kid,omitempty"`
+	EncryptedCEK []byte    `json:"encryptedcek,omitempty"`
+	EPK          PublicKey `json:"epk,omitempty"`
+	Alg          string    `json:"alg,omitempty"`
+	APU          []byte    `json:"apu,omitempty"`
+	APV          []byte    `json:"apv,omitempty"`
+}

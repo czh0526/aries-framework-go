@@ -2,13 +2,39 @@ package cryptoutil
 
 import (
 	"crypto/ed25519"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/teserakt-io/golang-ed25519/extra25519"
+	chacha "golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/crypto/curve25519"
 )
 
 const Curve25519KeySize = 32
 const NonceSize = 24
+
+func DeriveECDHX25519(fromPrivKey, toPubKey *[chacha.KeySize]byte) ([]byte, error) {
+	if fromPrivKey == nil || toPubKey == nil {
+		return nil, errors.New("deriveECDHX25519: invalid key")
+	}
+
+	z, err := curve25519.X25519(fromPrivKey[:], toPubKey[:])
+	if err != nil {
+		return nil, fmt.Errorf("deriveECDHX25519: %w", err)
+	}
+
+	return z, nil
+}
+
+func LengthPrefix(array []byte) []byte {
+	const prefixLen = 4
+
+	arrInfo := make([]byte, prefixLen+len(array))
+	binary.BigEndian.PutUint32(arrInfo, uint32(len(array)))
+	copy(arrInfo[prefixLen:], array)
+
+	return arrInfo
+}
 
 func PublicEd25519toCurve25519(pub []byte) ([]byte, error) {
 	if len(pub) == 0 {

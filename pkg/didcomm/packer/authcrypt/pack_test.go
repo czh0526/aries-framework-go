@@ -81,27 +81,85 @@ func TestAuthCryptPackerSuccess(t *testing.T) {
 			ct, err := authPacker.Pack(tc.cty, origMsg, []byte(skid+"."+sDIDKey), recipientsKeys)
 			require.NoError(t, err)
 			require.NotEmpty(t, ct)
+
+			jweStr, err := prettyPrint(ct)
+			require.NoError(t, err)
+			t.Logf("* authcrypt JWE: %s", jweStr)
+
+			env, err := authPacker.Unpack(ct)
+			require.NoError(t, err)
+
+			recKey, err := exportPubKeyBytes(keyHandles[0], recDIDKeys[0])
+			require.NoError(t, err)
+
+			senderPubKey := &spicrypto.PublicKey{}
+			err = json.Unmarshal(mSenderPubKey, senderPubKey)
+			require.NoError(t, err)
+
+			senderPubKey.KID = sDIDKey
+			mSenderPubKey, err = json.Marshal(senderPubKey)
+			require.NoError(t, err)
+
+			require.Equal(t, &transport.Envelope{
+				Message: origMsg,
+				FromKey: mSenderPubKey,
+				ToKey:   recKey,
+			}, env)
+
+			jweJSON, err := comp_jose.Deserialize(string(ct))
+			require.NoError(t, err)
+
+			jweStr, err = jweJSON.FullSerialize(json.Marshal)
+			require.NoError(t, err)
+			t.Logf("* authcrypt Flattened JWE JSON serialzation (using first recipient only): %s", jweStr)
+
+			env, err = authPacker.Unpack(ct)
+			require.NoError(t, err)
+
+			require.Equal(t, &transport.Envelope{
+				Message: origMsg,
+				FromKey: mSenderPubKey,
+				ToKey:   recKey,
+			}, env)
+
+			verifyJWETypes(t, tc.cty, jweJSON.ProtectedHeaders)
 		})
 	}
+}
+
+func verifyJWETypes(t *testing.T, cty string, jweHeader comp_jose.Headers) {
+	encodingType, ok := jweHeader.Type()
+	require.True(t, ok)
+	require.Equal(t, transport.MediaTypeV2EncryptedEnvelope, encodingType)
+
+	contentType, ok := jweHeader.ContentType()
+	require.True(t, contentType == "" || contentType != "" && ok)
+
+	require.Equal(t, cty, contentType)
 }
 
 func createAndMarshalKeyByKeyType(t *testing.T, kms spikms.KeyManager, kt spikms.KeyType) (
 	string, string, []byte, *keyset.Handle) {
 	t.Helper()
 
+	// 使用 KMS 构建一个 Keyset
 	kid, keyHandle, err := kms.Create(kt)
 	require.NoError(t, err)
 
+	// 获取 KeyHandle
 	kh, ok := keyHandle.(*keyset.Handle)
 	require.True(t, ok)
 
+	// 导出 Key 的公钥
 	pubKeyBytes, err := exportPubKeyBytes(kh, kid)
 	require.NoError(t, err)
 
+	//
 	key := &spicrypto.PublicKey{}
 	err = json.Unmarshal(pubKeyBytes, key)
 	require.NoError(t, err)
 
+	// 构建 DID Key
 	didKey, err := kmsdidkey.BuildDIDKeyByKeyType(pubKeyBytes, kt)
 	require.NoError(t, err)
 

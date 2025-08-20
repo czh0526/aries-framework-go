@@ -57,6 +57,40 @@ func (p *Packer) Unpack(envelope []byte) (*transport.Envelope, error) {
 	}, nil
 }
 
+func (p *Packer) decodeCipherText(cek *[chacha.KeySize]byte, envelope *legacyEnvelope) ([]byte, error) {
+	var cipherText, nonce, tag, aad, message []byte
+	aad = []byte(envelope.Protected)
+
+	cipherText, err := base64.URLEncoding.DecodeString(envelope.CipherText)
+	if err != nil {
+		return nil, fmt.Errorf("decodeCipherText: failed to decode b53Sender: %w", err)
+	}
+
+	nonce, err = base64.URLEncoding.DecodeString(envelope.IV)
+	if err != nil {
+		return nil, err
+	}
+
+	tag, err = base64.URLEncoding.DecodeString(envelope.Tag)
+	if err != nil {
+		return nil, err
+	}
+
+	chachaCipher, err := chacha.New(cek[:])
+	if err != nil {
+		return nil, err
+	}
+
+	payload := append(cipherText, tag...)
+
+	message, err = chachaCipher.Open(nil, nonce, payload, aad)
+	if err != nil {
+		return nil, err
+	}
+
+	return message, nil
+}
+
 type keys struct {
 	cek   *[chacha.KeySize]byte
 	myKey []byte

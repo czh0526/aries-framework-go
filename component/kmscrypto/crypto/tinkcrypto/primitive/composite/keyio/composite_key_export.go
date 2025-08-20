@@ -1,16 +1,19 @@
 package keyio
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	hybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
 	"google.golang.org/protobuf/proto"
 	"io"
+	"strings"
 )
 
 const (
@@ -189,4 +192,41 @@ func newECDHKey(mKey []byte) (compositeKeyGetter, error) {
 	return &ecdhKey{
 		protoKey: pubKeyProto,
 	}, nil
+}
+
+func ExtractPrimaryPublicKey(kh *keyset.Handle) (*spicrypto.PublicKey, error) {
+	keyBytes, err := writePubKeyFromKeyHandle(kh)
+	if err != nil {
+		return nil, fmt.Errorf("extractPrimaryPublicKey: failed to get public key content: %w", err)
+	}
+
+	ecPubKey := new(spicrypto.PublicKey)
+
+	err = json.Unmarshal(keyBytes, ecPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("extractPrimaryPublicKey: unmarshal public key failed: %w", err)
+	}
+
+	return ecPubKey, nil
+}
+
+func writePubKeyFromKeyHandle(kh *keyset.Handle) ([]byte, error) {
+	pubKH, err := kh.Public()
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "keyset contains a non-private key") {
+			pubKH = kh
+		} else {
+			return nil, err
+		}
+	}
+
+	buf := new(bytes.Buffer)
+	pubKeyWriter := NewWriter(buf)
+
+	err = pubKH.WriteWithNoSecrets(pubKeyWriter)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
