@@ -28,3 +28,15 @@ func NewOpt() *wrapKeyOpts {
 }
 
 type WrapKeyOpts func(opts *wrapKeyOpts)
+
+func WithSender(senderKey interface{}) WrapKeyOpts {
+	return func(opts *wrapKeyOpts) {
+		opts.senderKey = senderKey
+	}
+}
+
+func WithXC20PKW() WrapKeyOpts {
+	return func(opts *wrapKeyOpts) {
+		opts.useXC20PKW = true
+	}
+}

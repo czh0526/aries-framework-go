@@ -121,7 +121,7 @@ func (c *Crypto) derive1PUKEK(cekSize int, apu, apv, tag []byte, senderKH interf
 	two := 2
 
 	if useXC20PKW {
-		wrappingAlg = ECDH1PUXC20PWAlg
+		wrappingAlg = ECDH1PUXC20PKWAlg
 	} else {
 		switch cekSize {
 		case subtle.AES128Size * two:
@@ -191,6 +191,7 @@ func (c *Crypto) derive1PUWithECKey(wrappingAlg string, apu, apv, tag []byte, se
 		return "", nil, nil, nil, fmt.Errorf("derive1PUWithECKey: failed to retrieve sender key: %w", err)
 	}
 
+	// 转换 receiver public key, 随机生成 ephemeral private Key
 	pubKey, ephemeralPrivKey, err := c.convertRecKeyAndGenOrGetEPKEC(recPubKey, epkPrv)
 	if err != nil {
 		return "", nil, nil, nil, err
@@ -205,11 +206,13 @@ func (c *Crypto) derive1PUWithECKey(wrappingAlg string, apu, apv, tag []byte, se
 
 	keySize := aesCEKSize1PU(wrappingAlg)
 
+	// 构建 KEK
 	kek, err := c.ecKW.deriveSender1Pu(wrappingAlg, apu, apv, tag, ephemeralPrivKey, senderPrivKey, pubKey, keySize)
 	if err != nil {
 		return "", nil, nil, nil, fmt.Errorf("derive1PUWithECKey: failed to derive key: %w", err)
 	}
 
+	// 将 ephemeral public key 打包返回
 	epk := &spicrypto.PublicKey{
 		X:     ephemeralXBytes,
 		Y:     ephemeralPrivKey.Y.Bytes(),
@@ -262,7 +265,7 @@ func (c *Crypto) deriveESWithOKPKey(apu, apv []byte, recPubKey *spicrypto.Public
 
 func (c *Crypto) derive1PUWithOKPKey(wrappingAlg string, apu, apv, tag []byte, senderKH interface{},
 	recPubKey *spicrypto.PublicKey, epkPrv *spicrypto.PrivateKey) (string, []byte, *spicrypto.PublicKey, []byte, error) {
-	senderPrivKey, err := ksToPrivateECDSAKey(senderKH)
+	senderPrivKey, err := ksToPrivateX25519Key(senderKH)
 	if err != nil {
 		return "", nil, nil, nil, fmt.Errorf("derive1PUWithOKPKey: failed to retrieve sender key: %w", err)
 	}
@@ -315,6 +318,7 @@ func (c *Crypto) convertRecKeyAndGenOrGetEPKEC(recPubKey *spicrypto.PublicKey,
 			err)
 	}
 
+	// 将原始的 receiver public key 对应的椭圆曲线上的点转换成 ECDSA 椭圆曲线上的点
 	recECPubKey := &ecdsa.PublicKey{
 		Curve: curve,
 		X:     new(big.Int).SetBytes(recPubKey.X),
@@ -381,7 +385,7 @@ func (c *Crypto) deriveKEKAndUnwrap(alg string, encCEK, apu, apv, tag []byte, ep
 	}
 
 	switch alg {
-	case ECDH1PUA128KWAlg, ECDH1PUA192KWAlg, ECDH1PUA256KWAlg, ECDH1PUXC20PWAlg:
+	case ECDH1PUA128KWAlg, ECDH1PUA192KWAlg, ECDH1PUA256KWAlg, ECDH1PUXC20PKWAlg:
 		kek, err = c.derive1PUKEKForUnwrap(alg, apu, apv, tag, epk, senderKH, recipientPrivateKey)
 	case ECDHESA256KWAlg, ECDHESXC20PKWAlg:
 		kek, err = c.deriveESKEKForUnwrap(alg, apu, apv, epk, recipientPrivateKey)
@@ -396,7 +400,7 @@ func (c *Crypto) unwrapRaw(alg string, kek, encCEK []byte) ([]byte, error) {
 	var wk []byte
 
 	switch alg {
-	case ECDHESXC20PKWAlg, ECDH1PUXC20PWAlg:
+	case ECDHESXC20PKWAlg, ECDH1PUXC20PKWAlg:
 		aead, err := c.okpKW.createPrimitive(kek)
 		if err != nil {
 			return nil, fmt.Errorf("deriveKEKAndUnwrap: failed to create new XC20P primitive: %w", err)
@@ -484,12 +488,61 @@ func (c *Crypto) derive1PUWithECKeyForUnwrap(alg string, apu, apv, tag []byte, e
 		err          error
 	)
 
+	// 获取 sender 的 public key
 	senderPubKey, err = ksToPublicECDSAKey(senderKH, c.ecKW)
+	if err != nil {
+		return nil, fmt.Errorf("derive1PUWithECKeyForUnwrap: failed to retrive sender public key: %w", err)
+	}
+
+	// 提取 ephemeral public key
+	epkCurve, err = c.ecKW.getCurve(epk.Curve)
+	if err != nil {
+		return nil, fmt.Errorf("derive1PUWithECKeyForUnwrap: failed to GetCurve: %w", err)
+	}
+
+	epkPubKey := &ecdsa.PublicKey{
+		Curve: epkCurve,
+		X:     new(big.Int).SetBytes(epk.X),
+		Y:     new(big.Int).SetBytes(epk.Y),
+	}
+
+	// 获取 recipient 的 private key
+	recPrivECKey, ok := recipientPrivateKey.(*hybridsubtle.ECPrivateKey)
+	if !ok {
+		return nil, errors.New("derive1PUWithECKeyForUnwrap: invalid key is not an EC key")
+	}
+
+	recPrivKey := hybridECPrivToECDSAKey(recPrivECKey)
+
+	keySize := aesCEKSize1PU(alg)
+
+	// 派生 recipient 的共享密钥
+	kek, err := c.ecKW.deriveRecipient1Pu(alg, apu, apv, tag, epkPubKey, senderPubKey, recPrivKey, keySize)
+	if err != nil {
+		return nil, fmt.Errorf("derive1PUWithECKeyForUnwrap: failed to derive kek: %w", err)
+	}
+
+	return kek, nil
 }
 
 func (c *Crypto) derive1PUWithOKPKeyForUnwrap(alg string, apu, apv, tag []byte, epk *spicrypto.PublicKey,
 	senderKH interface{}, recipientPrivateKey interface{}) ([]byte, error) {
+	senderPubKey, err := ksToPublicX25519Key(senderKH)
+	if err != nil {
+		return nil, fmt.Errorf("derive1PUWithOKPKeyForUnwrap: failed to retrive sender public key: %w", err)
+	}
 
+	recPrivOKPKey, ok := recipientPrivateKey.([]byte)
+	if !ok {
+		return nil, errors.New("derive1PUWithOKPKeyForUnwrap: recipient key is not an OKP key")
+	}
+
+	kek, err := c.okpKW.deriveRecipient1Pu(alg, apu, apv, tag, epk.X, senderPubKey, recPrivOKPKey, defKeySize)
+	if err != nil {
+		return nil, fmt.Errorf("derive1PUWithOKPKeyForUnwrap: failed to derive kek: %w", err)
+	}
+
+	return kek, nil
 }
 
 func (c *Crypto) deriveESWithECKeyForUnwrap(alg string, apu, apv []byte, epk *spicrypto.PublicKey,
@@ -596,5 +649,39 @@ func ksToPublicECDSAKey(ks interface{}, kw keyWrapper) (*ecdsa.PublicKey, error)
 		return kst, nil
 	default:
 		return nil, fmt.Errorf("ksToPublicECDSAKey: unsupported keyset type: %T", kst)
+	}
+}
+
+func ksToPrivateX25519Key(ks interface{}) ([]byte, error) {
+	senderKH, ok := ks.(*keyset.Handle)
+	if !ok {
+		return nil, fmt.Errorf("ksToPrivateX25519Key: %w", errBadKeyHandleFormat)
+	}
+
+	senderPrivKey, err := extractPrivKey(senderKH)
+	if err != nil {
+		return nil, fmt.Errorf("ksToPrivateX25519Key: failed to extract sender key: %w", err)
+	}
+
+	prvKey, ok := senderPrivKey.([]byte)
+	if !ok {
+		return nil, errors.New("ksToPrivateX25519Key: not an OKP key")
+	}
+
+	return prvKey, nil
+}
+
+func ksToPublicX25519Key(ks interface{}) ([]byte, error) {
+	switch kst := ks.(type) {
+	case *keyset.Handle:
+		sPubKey, err := keyio.ExtractPrimaryPublicKey(kst)
+		if err != nil {
+			return nil, fmt.Errorf("ksToPublicX25519Key: failed to extract primary public key from keyset handle: %w", err)
+		}
+		return sPubKey.X, nil
+	case *spicrypto.PublicKey:
+		return kst.X, nil
+	default:
+		return nil, fmt.Errorf("ksToPublicX25519Key: unsupported keyset type: %T", kst)
 	}
 }
