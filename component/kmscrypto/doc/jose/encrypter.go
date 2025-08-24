@@ -22,6 +22,7 @@ import (
 	hybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
+	"github.com/tink-crypto/tink-go/v2/tink"
 	"golang.org/x/crypto/curve25519"
 	"math/big"
 	"sort"
@@ -85,7 +86,22 @@ func (je *JWEEncrypt) EncryptWithAuthData(plaintext, aad []byte) (*JSONWebEncryp
 	return je.encrypt(protectedHeaders, encPrimitive, plaintext, authData, cek, aad)
 }
 
-func (je *JWEEncrypt) encryptWithSender(primitive api.CompositeEncrypt,
+func (je *JWEEncrypt) encrypt(protectedHeaders map[string]interface{}, encPrimitive tink.AEAD,
+	plaintext, authData, cek, aad []byte) (*JSONWebEncryption, error) {
+	recipients, singleRecipientHeaderAADs, err := je.wrapCEKForRecipients(cek, []byte{}, []byte{}, authData,
+		json.Marshal)
+	if err != nil {
+		return nil, fmt.Errorf("jweencrypt: failed to wrap cek: %w", err)
+	}
+
+	if len(singleRecipientHeaderAADs) > 0 {
+		authData = singleRecipientHeaderAADs
+	}
+
+	recipientHeaders, singleRecipientHeaders, err := je.buildRecs(recipients, false)
+}
+
+func (je *JWEEncrypt) encryptWithSender(primitive tink.AEAD,
 	plaintext, authData, cek, aad []byte) (*JSONWebEncryption, error) {
 
 	apu, apv, err := je.buildAPUAPV()
@@ -109,6 +125,122 @@ func (je *JWEEncrypt) encryptWithSender(primitive api.CompositeEncrypt,
 	err = json.Unmarshal(serializedEncData, encData)
 	if err != nil {
 		return nil, fmt.Errorf("jweencryptWithSender: unmarshal encrypted data failed: %w", err)
+	}
+}
+
+func (je *JWEEncrypt) wrapCEKForRecipients(cek, apu, apv, aad []byte,
+	marshaller marshalFunc) ([]*spicrypto.RecipientWrappedKey, []byte, error) {
+	return je.wrapCEKForRecipientsWithTagAndEPK(cek, apu, apv, aad, nil, marshaller, nil)
+}
+
+func (je *JWEEncrypt) wrapCEKForRecipientsWithTagAndEPK(cek, apu, apv, aad, tag []byte,
+	marshaller marshalFunc, epk *spicrypto.PrivateKey) ([]*spicrypto.RecipientWrappedKey, []byte, error) {
+	var (
+		computedAPU []byte
+		computedAPV []byte
+		err         error
+	)
+
+	if len(tag) > 0 {
+		computedAPU, computedAPV, err = je.buildAPUAPV()
+		if err != nil {
+			return nil, nil, fmt.Errorf("wrapCEKForRecipientsWithTagAndEPK: %w", err)
+		}
+	}
+
+	if len(apv) == 0 {
+		apv = make([]byte, len(computedAPV))
+		copy(apv, computedAPV)
+	}
+
+	if len(apu) == 0 && je.skid != "" {
+		apu = make([]byte, len(computedAPU))
+		copy(apu, computedAPU)
+	}
+
+	wrapOpts := je.getWrapKeyOpts(tag, epk)
+
+	rw, kek, err := je.wrapKey(cek, apu, apv, aad, wrapOpts, marshaller)
+	if err != nil {
+		return nil, nil, fmt.Errorf("wrapCEKForRecipientsWithTagAndEPK: %w", err)
+	}
+
+	return rw, kek, nil
+}
+
+func (je *JWEEncrypt) getWrapKeyOpts(tag []byte, epk *spicrypto.PrivateKey) []spicrypto.WrapKeyOpts {
+	var wrapOpts []spicrypto.WrapKeyOpts
+
+	if je.recipientsKeys[0].Type == "OKP" {
+		wrapOpts = append(wrapOpts, spicrypto.WithXC20PKW())
+	}
+
+	if je.skid != "" && je.senderKH != nil {
+		wrapOpts = append(wrapOpts, spicrypto.WithSender(je.senderKH))
+	}
+
+	if len(tag) > 0 {
+		wrapOpts = append(wrapOpts, spicrypto.WithTag(tag))
+	}
+
+	if epk != nil {
+		wrapOpts = append(wrapOpts, spicrypto.WithEPK(epk))
+	}
+
+	return wrapOpts
+}
+
+func (je *JWEEncrypt) wrapKey(cek, apu, apv, aad []byte, wrapOpts []spicrypto.WrapKeyOpts,
+	marshaller marshalFunc) ([]*spicrypto.RecipientWrappedKey, []byte, error) {
+	var (
+		recipientsWK       []*spicrypto.RecipientWrappedKey
+		singleRecipientAAD []byte
+	)
+
+	for i, recPubKey := range je.recipientsKeys {
+		var (
+			kek *spicrypto.RecipientWrappedKey
+			err error
+		)
+
+		if len(wrapOpts) > 0 {
+			kek, err = je.crypto.WrapKey(cek, apu, apv, recPubKey, wrapOpts...)
+		} else {
+			kek, err = je.crypto.WrapKey(cek, apu, apv, recPubKey)
+		}
+
+		if err != nil {
+			return nil, nil, fmt.Errorf("wrapKey: %d failed: %w", i+1, err)
+		}
+
+		je.encodeAPUAPV(kek)
+
+		recipientsWK = append(recipientsWK, kek)
+
+		if len(je.recipientsKeys) == 1 {
+			singleRecipientAAD, err = mergeSingleRecipientHeaders(kek, aad, marshaller)
+			if err != nil {
+				return nil, nil, fmt.Errorf("wrapKey: merge recipient headers failed for %d: %w", i+1, err)
+			}
+		}
+	}
+
+	return recipientsWK, singleRecipientAAD, nil
+}
+
+func (je *JWEEncrypt) encodeAPUAPV(kek *spicrypto.RecipientWrappedKey) {
+	if len(kek.APU) > 0 {
+		apuBytes := make([]byte, len(kek.APU))
+		copy(apuBytes, kek.APU)
+		kek.APU = make([]byte, base64.RawURLEncoding.DecodedLen(len(apuBytes)))
+		base64.RawURLEncoding.Encode(kek.APU, apuBytes)
+	}
+
+	if len(kek.APV) > 0 {
+		apvBytes := make([]byte, len(kek.APV))
+		copy(apvBytes, kek.APV)
+		kek.APV = make([]byte, base64.RawURLEncoding.DecodedLen(len(apvBytes)))
+		base64.RawURLEncoding.Encode(kek.APV, apvBytes)
 	}
 }
 
@@ -139,6 +271,104 @@ func (je *JWEEncrypt) buildAPUAPV() ([]byte, []byte, error) {
 	copy(apv, apv32[:])
 
 	return apu, apv, nil
+}
+
+func mergeSingleRecipientHeaders(recipientWK *spicrypto.RecipientWrappedKey, aad []byte,
+	marshaller marshalFunc) ([]byte, error) {
+	var externalAAD []byte
+
+	aadIdx := len(aad)
+
+	if i := bytes.Index(aad, []byte(".")); i > 0 {
+		aadIdx = i
+		externalAAD = append(externalAAD, aad[aadIdx+1:]...)
+	}
+
+	newAAD, err := base64.RawURLEncoding.DecodeString(string(aad[:aadIdx]))
+	if err != nil {
+		return nil, err
+	}
+
+	rawHeaders := map[string]json.RawMessage{}
+
+	err = json.Unmarshal(newAAD, &rawHeaders)
+	if err != nil {
+		return nil, err
+	}
+
+	if recipientWK.KID != "" {
+		var kid []byte
+
+		kid, err = marshaller(recipientWK.KID)
+		if err != nil {
+			return nil, err
+		}
+		rawHeaders["kid"] = kid
+	}
+
+	alg, err := marshaller(recipientWK.Alg)
+	if err != nil {
+		return nil, err
+	}
+	rawHeaders["alg"] = alg
+
+	err = addKDFHeaders(rawHeaders, recipientWK, marshaller)
+	if err != nil {
+		return nil, err
+	}
+
+	mAAD, err := marshaller(rawHeaders)
+	if err != nil {
+		return nil, err
+	}
+
+	mAADStr := []byte(base64.RawURLEncoding.EncodeToString(mAAD))
+
+	if len(externalAAD) > 0 {
+		mAADStr = append(mAADStr, byte('.'))
+		mAADStr = append(mAADStr, externalAAD...)
+	}
+
+	return mAADStr, nil
+}
+
+func addKDFHeaders(rawHeaders map[string]json.RawMessage, recipientWK *spicrypto.RecipientWrappedKey,
+	marshaller marshalFunc) error {
+	var err error
+
+	mEPK, err := convertRecEPKToMarshalledJWK(&recipientWK.EPK)
+	if err != nil {
+		return err
+	}
+	rawHeaders["epk"] = mEPK
+
+	if len(recipientWK.APU) != 0 {
+		rawHeaders["apu"], err = marshaller(fmt.Sprintf("%s", recipientWK.APU))
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(recipientWK.APV) != 0 {
+		rawHeaders["apv"], err = marshaller(fmt.Sprintf("%s", recipientWK.APV))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (je *JWEEncrypt) buildRecs(recWKs []*spicrypto.RecipientWrappedKey,
+	forAuthcrypt bool) ([]*Recipient, *RecipientHeaders, error) {
+	var (
+		recipients      []*Recipient
+		singleRecipient *RecipientHeaders
+	)
+
+	for _, rec := range recWKs {
+
+	}
 }
 
 func (je *JWEEncrypt) generateEPKAndUpdateAuthDataFor1PU(auth, cek, apu, apv []byte) (
@@ -376,7 +606,7 @@ func (je *JWEEncrypt) useNISTPKW() bool {
 	return true
 }
 
-func (je *JWEEncrypt) getECDHEncPrimitive(cek []byte) (api.CompositeEncrypt, error) {
+func (je *JWEEncrypt) getECDHEncPrimitive(cek []byte) (tink.AEAD, error) {
 	nistpKW := je.useNISTPKW()
 
 	encAlg, ok := aeadAlg[je.encAlg]
@@ -396,7 +626,7 @@ func (je *JWEEncrypt) getECDHEncPrimitive(cek []byte) (api.CompositeEncrypt, err
 		return nil, err
 	}
 
-	return ecdh.NewECDHEncrypt(pubKH)
+	return ecdh.NewECDHCrypto(pubKH)
 }
 
 func computeAuthData(protectedHeaders map[string]interface{}, origProtectedHeader string,

@@ -40,3 +40,15 @@ func WithXC20PKW() WrapKeyOpts {
 		opts.useXC20PKW = true
 	}
 }
+
+func WithTag(tag []byte) WrapKeyOpts {
+	return func(opts *wrapKeyOpts) {
+		opts.tag = tag
+	}
+}
+
+func WithEPK(epk *PrivateKey) WrapKeyOpts {
+	return func(opts *wrapKeyOpts) {
+		opts.epk = epk
+	}
+}

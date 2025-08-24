@@ -9,6 +9,9 @@ type Crypto interface {
 
 	ComputeMAC(data []byte, kh interface{}) ([]byte, error)
 	VerifyMAC(mac, data []byte, kh interface{}) error
+
+	WrapKey(cek, apu, apv []byte, recPubKey *PublicKey, opts ...WrapKeyOpts) (*RecipientWrappedKey, error)
+	UnwrapKey(recWK *RecipientWrappedKey, kh interface{}, opts ...WrapKeyOpts) ([]byte, error)
 }
 
 type PublicKey struct {
