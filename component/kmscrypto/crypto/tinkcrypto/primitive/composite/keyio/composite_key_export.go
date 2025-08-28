@@ -3,11 +3,16 @@ package keyio
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/aead"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
+	tinkaead "github.com/tink-crypto/tink-go/v2/aead"
 	hybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
+	"github.com/tink-crypto/tink-go/v2/insecurecleartextkeyset"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	commonpb "github.com/tink-crypto/tink-go/v2/proto/common_go_proto"
 	tinkpb "github.com/tink-crypto/tink-go/v2/proto/tink_go_proto"
@@ -210,6 +215,182 @@ func ExtractPrimaryPublicKey(kh *keyset.Handle) (*spicrypto.PublicKey, error) {
 	return ecPubKey, nil
 }
 
+func PublicKeyToKeysetHandle(pubKey *spicrypto.PublicKey, aeadAlg ecdh.AEADAlg) (*keyset.Handle, error) {
+	cp, err := getCurveProto(pubKey.Curve)
+	if err != nil {
+		return nil, fmt.Errorf("publicKeyToKeysetHandle: failed to convert curve string to proto: %w", err)
+	}
+
+	kt, err := getKeyType(pubKey.Type)
+	if err != nil {
+		return nil, fmt.Errorf("publicKeyToKeysetHandle: failed to convert key type to proto: %w", err)
+	}
+
+	encT, keyURL, err := keyTemplateAndURL(cp, aeadAlg, true)
+	if err != nil {
+		return nil, fmt.Errorf("publicKeyToKeysetHandle: %w", err)
+	}
+
+	protoKey := &ecdhpb.EcdhAeadPublicKey{
+		Version: 0,
+		Params: &ecdhpb.EcdhAeadParams{
+			KwParams: &ecdhpb.EcdhKwParams{
+				CurveType: cp,
+				KeyType:   kt,
+			},
+			EncParams: &ecdhpb.EcdhAeadEncParams{
+				AeadEnc: encT,
+			},
+			EcPointFormat: commonpb.EcPointFormat_UNCOMPRESSED,
+		},
+		KID: pubKey.KID,
+		X:   pubKey.X,
+		Y:   pubKey.Y,
+	}
+
+	marshalledKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, fmt.Errorf("publicKeyToKeysetHandle: failed to marshal proto: %w", err)
+	}
+
+	ks := newKeySet(keyURL, marshalledKey, tinkpb.KeyData_ASYMMETRIC_PUBLIC)
+	memReader := &keyset.MemReaderWriter{Keyset: ks}
+	parsedHandle, err := insecurecleartextkeyset.Read(memReader)
+
+	return parsedHandle, err
+}
+
+func PrivateKeyToKeysetHandle(privKey *spicrypto.PrivateKey, aeadAlg ecdh.AEADAlg) (*keyset.Handle, error) {
+	cp, err := getCurveProto(privKey.PublicKey.Curve)
+	if err != nil {
+		return nil, fmt.Errorf("privateKeyToKeysetHandle: failed to convert curve string to proto: %w", err)
+	}
+
+	kt, err := getKeyType(privKey.PublicKey.Type)
+	if err != nil {
+		return nil, fmt.Errorf("privateKeyToKeysetHandle: failed to convert key type to proto: %w", err)
+	}
+
+	encT, keyURL, err := keyTemplateAndURL(cp, aeadAlg, false)
+	if err != nil {
+		return nil, fmt.Errorf("privateKeyToKeysetHandle: %w", err)
+	}
+
+	protoKey := &ecdhpb.EcdhAeadPrivateKey{
+		Version: 0,
+		PublicKey: &ecdhpb.EcdhAeadPublicKey{
+			Version: 0,
+			Params: &ecdhpb.EcdhAeadParams{
+				KwParams: &ecdhpb.EcdhKwParams{
+					CurveType: cp,
+					KeyType:   kt,
+				},
+				EncParams: &ecdhpb.EcdhAeadEncParams{
+					AeadEnc: encT,
+				},
+				EcPointFormat: commonpb.EcPointFormat_UNCOMPRESSED,
+			},
+			KID: privKey.PublicKey.KID,
+			X:   privKey.PublicKey.X,
+			Y:   privKey.PublicKey.Y,
+		},
+		KeyValue: privKey.D,
+	}
+
+	marshalledKey, err := proto.Marshal(protoKey)
+	if err != nil {
+		return nil, fmt.Errorf("privateKeyToKeysetHandle: failed to marshal proto: %w", err)
+	}
+
+	ks := newKeySet(keyURL, marshalledKey, tinkpb.KeyData_ASYMMETRIC_PRIVATE)
+
+	memReader := &keyset.MemReaderWriter{Keyset: ks}
+
+	parsedHandle, err := insecurecleartextkeyset.Read(memReader)
+	if err != nil {
+		return nil, fmt.Errorf("privateKeyToKeysetHandle: failed to create key handle: %w", err)
+	}
+
+	return parsedHandle, nil
+}
+
+var keyTemplateToPublicKeyURL = map[commonpb.EllipticCurveType]string{
+	commonpb.EllipticCurveType_NIST_P256:  nistPECDHKWPublicKeyTypeURL,
+	commonpb.EllipticCurveType_NIST_P384:  nistPECDHKWPublicKeyTypeURL,
+	commonpb.EllipticCurveType_NIST_P521:  nistPECDHKWPublicKeyTypeURL,
+	commonpb.EllipticCurveType_CURVE25519: x25519ECDHKWPublicKeyTypeURL,
+}
+
+var keyTemplateToPrivateKeyURL = map[commonpb.EllipticCurveType]string{
+	commonpb.EllipticCurveType_NIST_P256:  nistPECDHKWPrivateKeyTypeURL,
+	commonpb.EllipticCurveType_NIST_P384:  nistPECDHKWPrivateKeyTypeURL,
+	commonpb.EllipticCurveType_NIST_P521:  nistPECDHKWPrivateKeyTypeURL,
+	commonpb.EllipticCurveType_CURVE25519: nistPECDHKWPrivateKeyTypeURL,
+}
+
+func keyTemplateAndURL(cp commonpb.EllipticCurveType, aeadAlg ecdh.AEADAlg,
+	isPublic bool) (*tinkpb.KeyTemplate, string, error) {
+	var (
+		encT   *tinkpb.KeyTemplate
+		keyURL string
+	)
+
+	if isPublic {
+		keyURL = keyTemplateToPublicKeyURL[cp]
+	} else {
+		keyURL = keyTemplateToPrivateKeyURL[cp]
+	}
+
+	if keyURL == "" {
+		return nil, "", fmt.Errorf("invalid key curve: `%s`", cp)
+	}
+
+	switch aeadAlg {
+	case ecdh.AES256GCM:
+		encT = tinkaead.AES256GCMKeyTemplate()
+	case ecdh.XC20P:
+		encT = tinkaead.XChaCha20Poly1305KeyTemplate()
+	case ecdh.AES128CBCHMACSHA256:
+		encT = aead.AES128CBCHMACSHA256KeyTemplate()
+	case ecdh.AES192CBCHMACSHA384:
+		encT = aead.AES192CBCHMACSHA384KeyTemplate()
+	case ecdh.AES256CBCHMACSHA384:
+		encT = aead.AES256CBCHMACSHA384KeyTemplate()
+	case ecdh.AES256CBCHMACSHA512:
+		encT = aead.AES256CBCHMACSHA512KeyTemplate()
+	default:
+		return nil, "", fmt.Errorf("invalid encryption algorithm: `%s`", ecdh.EncryptionAlgLabel[aeadAlg])
+	}
+
+	return encT, keyURL, nil
+}
+
+func getKeyType(k string) (ecdhpb.KeyType, error) {
+	switch k {
+	case ecdhpb.KeyType_EC.String():
+		return ecdhpb.KeyType_EC, nil
+	case ecdhpb.KeyType_OKP.String():
+		return ecdhpb.KeyType_OKP, nil
+	default:
+		return ecdhpb.KeyType_UNKNOWN_KEY_TYPE, errors.New("unknown key type")
+	}
+}
+
+func getCurveProto(c string) (commonpb.EllipticCurveType, error) {
+	switch c {
+	case "secp256r1", "NIST_P256", "P-256", "EllipticCutveType_NIST_P256":
+		return commonpb.EllipticCurveType_NIST_P256, nil
+	case "secp384r1", "NIST_P384", "P-384", "EllipticCutveType_NIST_P384":
+		return commonpb.EllipticCurveType_NIST_P384, nil
+	case "secp521r1", "NIST_P521", "P-521", "EllipticCutveType_NIST_P521":
+		return commonpb.EllipticCurveType_NIST_P521, nil
+	case commonpb.EllipticCurveType_CURVE25519.String(), "X25519":
+		return commonpb.EllipticCurveType_CURVE25519, nil
+	default:
+		return commonpb.EllipticCurveType_UNKNOWN_CURVE, errors.New("unsupported curve")
+	}
+}
+
 func writePubKeyFromKeyHandle(kh *keyset.Handle) ([]byte, error) {
 	pubKH, err := kh.Public()
 	if err != nil {
@@ -229,4 +410,24 @@ func writePubKeyFromKeyHandle(kh *keyset.Handle) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+func newKeySet(tURL string, marshalledKey []byte, keyMaterialType tinkpb.KeyData_KeyMaterialType) *tinkpb.Keyset {
+	keyData := &tinkpb.KeyData{
+		TypeUrl:         tURL,
+		Value:           marshalledKey,
+		KeyMaterialType: keyMaterialType,
+	}
+
+	return &tinkpb.Keyset{
+		Key: []*tinkpb.Keyset_Key{
+			{
+				KeyData:          keyData,
+				Status:           tinkpb.KeyStatusType_ENABLED,
+				KeyId:            1,
+				OutputPrefixType: tinkpb.OutputPrefixType_RAW,
+			},
+		},
+		PrimaryKeyId: 1,
+	}
 }

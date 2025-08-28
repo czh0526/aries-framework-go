@@ -13,6 +13,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/aead/subtle"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/api"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
@@ -22,7 +23,6 @@ import (
 	hybrid "github.com/tink-crypto/tink-go/v2/hybrid/subtle"
 	"github.com/tink-crypto/tink-go/v2/keyset"
 	"github.com/tink-crypto/tink-go/v2/subtle/random"
-	"github.com/tink-crypto/tink-go/v2/tink"
 	"golang.org/x/crypto/curve25519"
 	"math/big"
 	"sort"
@@ -67,6 +67,7 @@ func (je *JWEEncrypt) EncryptWithAuthData(plaintext, aad []byte) (*JSONWebEncryp
 	}
 	je.addExtraProtectedHeaders(protectedHeaders)
 
+	// 获取 Content Encrypt Key
 	cek := je.newCEK()
 
 	encPrimitive, err := je.getECDHEncPrimitive(cek)
@@ -86,7 +87,7 @@ func (je *JWEEncrypt) EncryptWithAuthData(plaintext, aad []byte) (*JSONWebEncryp
 	return je.encrypt(protectedHeaders, encPrimitive, plaintext, authData, cek, aad)
 }
 
-func (je *JWEEncrypt) encrypt(protectedHeaders map[string]interface{}, encPrimitive tink.AEAD,
+func (je *JWEEncrypt) encrypt(protectedHeaders map[string]interface{}, encPrimitive api.CompositeEncrypt,
 	plaintext, authData, cek, aad []byte) (*JSONWebEncryption, error) {
 	recipients, singleRecipientHeaderAADs, err := je.wrapCEKForRecipients(cek, []byte{}, []byte{}, authData,
 		json.Marshal)
@@ -98,10 +99,31 @@ func (je *JWEEncrypt) encrypt(protectedHeaders map[string]interface{}, encPrimit
 		authData = singleRecipientHeaderAADs
 	}
 
-	recipientHeaders, singleRecipientHeaders, err := je.buildRecs(recipients, false)
+	recipientsHeaders, singleRecipientHeaders, err := je.buildRecs(recipients, false)
+	if err != nil {
+		return nil, fmt.Errorf("jweencrypt: failed to build recipients: %w", err)
+	}
+
+	serializedEncData, err := encPrimitive.Encrypt(plaintext, authData)
+	if err != nil {
+		return nil, fmt.Errorf("jweencrypt: failed to Encrypt: %w", err)
+	}
+
+	encData := new(composite.EncryptedData)
+
+	err = json.Unmarshal(serializedEncData, encData)
+	if err != nil {
+		return nil, fmt.Errorf("jweencrypt: unmarshal encrypted data failed: %w", err)
+	}
+
+	if singleRecipientHeaders != nil {
+		mergeRecipientHeaders(protectedHeaders, singleRecipientHeaders)
+	}
+
+	return getJSONWebEncryption(encData, recipientsHeaders, protectedHeaders, aad), nil
 }
 
-func (je *JWEEncrypt) encryptWithSender(primitive tink.AEAD,
+func (je *JWEEncrypt) encryptWithSender(primitive api.CompositeEncrypt,
 	plaintext, authData, cek, aad []byte) (*JSONWebEncryption, error) {
 
 	apu, apv, err := je.buildAPUAPV()
@@ -126,6 +148,19 @@ func (je *JWEEncrypt) encryptWithSender(primitive tink.AEAD,
 	if err != nil {
 		return nil, fmt.Errorf("jweencryptWithSender: unmarshal encrypted data failed: %w", err)
 	}
+
+	recipients, _, err := je.wrapCEKForRecipientsWithTagAndEPK(cek, apu, apv, authData,
+		encData.Tag, json.Marshal, epk)
+	if err != nil {
+		return nil, fmt.Errorf("jweencryptWithSender: failed to wrap cek: %w", err)
+	}
+
+	recipientsHeaders, _, err := je.buildRecs(recipients, true)
+	if err != nil {
+		return nil, fmt.Errorf("jweencryptWithSender: failed to build recipients: %w", err)
+	}
+
+	return getJSONWebEncryption(encData, recipientsHeaders, newProtectedHeaders, aad), nil
 }
 
 func (je *JWEEncrypt) wrapCEKForRecipients(cek, apu, apv, aad []byte,
@@ -232,7 +267,7 @@ func (je *JWEEncrypt) encodeAPUAPV(kek *spicrypto.RecipientWrappedKey) {
 	if len(kek.APU) > 0 {
 		apuBytes := make([]byte, len(kek.APU))
 		copy(apuBytes, kek.APU)
-		kek.APU = make([]byte, base64.RawURLEncoding.DecodedLen(len(apuBytes)))
+		kek.APU = make([]byte, base64.RawURLEncoding.EncodedLen(len(apuBytes)))
 		base64.RawURLEncoding.Encode(kek.APU, apuBytes)
 	}
 
@@ -271,6 +306,46 @@ func (je *JWEEncrypt) buildAPUAPV() ([]byte, []byte, error) {
 	copy(apv, apv32[:])
 
 	return apu, apv, nil
+}
+
+func decodeAPUAPV(headers *RecipientHeaders) ([]byte, []byte, error) {
+	var (
+		decodedAPU []byte
+		decodedAPV []byte
+		err        error
+	)
+
+	if len(headers.APU) > 0 {
+		decodedAPU, err = base64.RawURLEncoding.DecodeString(headers.APU)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if len(headers.APV) > 0 {
+		decodedAPV, err = base64.RawURLEncoding.DecodeString(headers.APV)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return decodedAPU, decodedAPV, nil
+}
+
+func mergeRecipientHeaders(headers map[string]interface{}, recHeaders *RecipientHeaders) {
+	headers[HeaderAlgorithm] = recHeaders.Alg
+	if recHeaders.KID != "" {
+		headers[HeaderKeyID] = recHeaders.KID
+	}
+
+	headers[HeaderEPK] = recHeaders.EPK
+	if recHeaders.APU != "" {
+		headers["apu"] = base64.RawURLEncoding.EncodeToString([]byte(recHeaders.APU))
+	}
+
+	if recHeaders.APV != "" {
+		headers["apv"] = base64.RawURLEncoding.EncodeToString([]byte(recHeaders.APV))
+	}
 }
 
 func mergeSingleRecipientHeaders(recipientWK *spicrypto.RecipientWrappedKey, aad []byte,
@@ -362,13 +437,66 @@ func addKDFHeaders(rawHeaders map[string]json.RawMessage, recipientWK *spicrypto
 func (je *JWEEncrypt) buildRecs(recWKs []*spicrypto.RecipientWrappedKey,
 	forAuthcrypt bool) ([]*Recipient, *RecipientHeaders, error) {
 	var (
-		recipients      []*Recipient
-		singleRecipient *RecipientHeaders
+		recipients             []*Recipient
+		singleRecipientHeaders *RecipientHeaders
 	)
 
 	for _, rec := range recWKs {
+		recHeaders, err := buildRecipientHeaders(rec, forAuthcrypt)
+		if err != nil {
+			return nil, nil, err
+		}
 
+		recipients = append(recipients, &Recipient{
+			EncryptedKey: string(rec.EncryptedCEK),
+			Header:       recHeaders,
+		})
+
+		if len(recWKs) == 1 {
+			var (
+				decodedAPU []byte
+				decodedAPV []byte
+				err        error
+			)
+
+			decodedAPU, decodedAPV, err = decodeAPUAPV(recipients[0].Header)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			singleRecipientHeaders = &RecipientHeaders{
+				Alg: recipients[0].Header.Alg,
+				KID: recipients[0].Header.KID,
+				EPK: recipients[0].Header.EPK,
+				APU: string(decodedAPU),
+				APV: string(decodedAPV),
+			}
+
+			recipients[0].Header = nil
+		}
 	}
+
+	return recipients, singleRecipientHeaders, nil
+}
+
+func buildRecipientHeaders(rec *spicrypto.RecipientWrappedKey, forAuthcrypt bool) (*RecipientHeaders, error) {
+	mRecJWK, err := convertRecEPKToMarshalledJWK(&rec.EPK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert recipient key to marshalled JWK: %w", err)
+	}
+
+	rh := &RecipientHeaders{
+		KID: rec.KID,
+	}
+
+	if !forAuthcrypt {
+		rh.Alg = rec.Alg
+		rh.EPK = mRecJWK
+		rh.APU = string(rec.APU)
+		rh.APV = string(rec.APV)
+	}
+
+	return rh, nil
 }
 
 func (je *JWEEncrypt) generateEPKAndUpdateAuthDataFor1PU(auth, cek, apu, apv []byte) (
@@ -525,7 +653,7 @@ func (je *JWEEncrypt) buildCommonAuthData(aadIndex int, kwAlg, authData string,
 	return epk, []byte(authData), authDataJSON, nil
 }
 
-func NewJWEEncrypt(encAlg EncAlg, envelopMediaType, cty, senderKID string, senderKH *keyset.Handle,
+func NewJWEEncrypt(encAlg EncAlg, envelopeMediaType, cty, senderKID string, senderKH *keyset.Handle,
 	recipientsPubKeys []*spicrypto.PublicKey, crypto spicrypto.Crypto) (*JWEEncrypt, error) {
 	if len(recipientsPubKeys) == 0 {
 		return nil, errors.New("empty recipientsPubKeys list")
@@ -552,7 +680,7 @@ func NewJWEEncrypt(encAlg EncAlg, envelopMediaType, cty, senderKID string, sende
 		skid:           senderKID,
 		senderKH:       senderKH,
 		encAlg:         encAlg,
-		encTyp:         envelopMediaType,
+		encTyp:         envelopeMediaType,
 		cty:            cty,
 		crypto:         crypto,
 	}, nil
@@ -599,33 +727,38 @@ func (je *JWEEncrypt) useNISTPKW() bool {
 			"type.hyperledger.org/hyperledger.aries.crypto.tink.NistPEcdhKwPrivateKey":
 			return true
 		case "type.hyperledger.org/hyperledger.aries.crypto.tink.X25519EcdhKwPublicKey",
-			"type.hedgerledger.org/hyperledger.aries.crypto.tink.X25519EcdhKwPrivateKey":
+			"type.hyperledger.org/hyperledger.aries.crypto.tink.X25519EcdhKwPrivateKey":
 			return false
 		}
 	}
 	return true
 }
 
-func (je *JWEEncrypt) getECDHEncPrimitive(cek []byte) (tink.AEAD, error) {
+func (je *JWEEncrypt) getECDHEncPrimitive(cek []byte) (api.CompositeEncrypt, error) {
 	nistpKW := je.useNISTPKW()
 
+	// 获取 AEAD Algorithm
 	encAlg, ok := aeadAlg[je.encAlg]
 	if !ok {
 		return nil, fmt.Errorf("getECDHEncPrimitive: encAlg not supported: '%v'", je.encAlg)
 	}
 
+	// 获取 Key Template
 	kt := ecdh.KeyTemplateForECDHPrimitiveWithCEK(cek, nistpKW, encAlg)
 
+	// 创建 Keyset Handle
 	kh, err := keyset.NewHandle(kt)
 	if err != nil {
 		return nil, err
 	}
 
+	// 获取 Handle 的 public key handle
 	pubKH, err := kh.Public()
 	if err != nil {
 		return nil, err
 	}
 
+	// 创建一个 ECDH Crypto
 	return ecdh.NewECDHCrypto(pubKH)
 }
 
@@ -729,4 +862,16 @@ func convertRecEPKToMarshalledJWK(recEPK *spicrypto.PublicKey) ([]byte, error) {
 	}
 
 	return recJWK.MarshalJSON()
+}
+
+func getJSONWebEncryption(encData *composite.EncryptedData, recipientsHeaders []*Recipient,
+	protectedHeaders map[string]interface{}, aad []byte) *JSONWebEncryption {
+	return &JSONWebEncryption{
+		IV:               string(encData.IV),
+		Tag:              string(encData.Tag),
+		Ciphertext:       string(encData.Ciphertext),
+		Recipients:       recipientsHeaders,
+		ProtectedHeaders: protectedHeaders,
+		AAD:              string(aad),
+	}
 }

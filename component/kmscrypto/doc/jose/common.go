@@ -55,6 +55,14 @@ func (h Headers) KeyID() (string, bool) {
 	return h.stringValue(HeaderKeyID)
 }
 
+func (h Headers) SenderKeyID() (string, bool) {
+	return h.stringValue(HeaderSenderKeyID)
+}
+
+func (h Headers) Algorithm() (string, bool) {
+	return h.stringValue(HeaderAlgorithm)
+}
+
 func (h Headers) Encryption() (string, bool) {
 	return h.stringValue(HeaderEncryption)
 }
