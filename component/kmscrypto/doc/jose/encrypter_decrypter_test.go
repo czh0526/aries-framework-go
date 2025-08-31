@@ -6,12 +6,14 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/ecdh"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/composite/keyio"
 	ecdhpb "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto/primitive/proto/ecdh_aead_go_proto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmsdidkey"
+	mockkms "github.com/czh0526/aries-framework-go/component/kmscrypto/mock/kms"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/go-jose/go-jose/v3"
@@ -33,6 +35,41 @@ const (
 	fullSerialization      = "Full"
 	flattenedSerialization = "Flattened"
 )
+
+func TestInteropWithGoJoseEncryptAndLocalJoseDecrypt(t *testing.T) {
+	recECKeys, recKHs, recKIDs, _ := createRecipients(t, 3)
+	gjRecipients := convertToGoJoseRecipients(t, recECKeys, recKIDs)
+
+	c, k := createCryptoAndKMSServices(t, recKHs)
+
+	eo := &jose.EncrypterOptions{}
+	gjEncrypter, err := jose.NewMultiEncrypter(jose.A256GCM, gjRecipients,
+		eo.WithType(EnvelopeEncodingType))
+	require.NoError(t, err)
+
+	pt := []byte("Test secret message")
+	aad := []byte("Test some auth data")
+
+	gjJWEEncrypter, err := gjEncrypter.EncryptWithAuthData(pt, aad)
+	require.NoError(t, err)
+
+	gjSerializedJWE := gjJWEEncrypter.FullSerialize()
+	require.NoError(t, err)
+
+	fmt.Printf("Go Jose Encrypt => \n%s\n", gjSerializedJWE)
+	localJWE, err := Deserialize(gjSerializedJWE)
+	require.NoError(t, err)
+
+	t.Run("Decrypting JWE message encrypted by go-joes test success", func(t *testing.T) {
+		jweDecrypter := NewJWEDecrypt(nil, c, k)
+
+		var msg []byte
+
+		msg, err = jweDecrypter.Decrypt(localJWE)
+		require.NoError(t, err)
+		require.Equal(t, pt, msg)
+	})
+}
 
 func TestInteropWithLocalJoseEncryptAndGoJoseDecrypt(t *testing.T) {
 	c, err := tinkcrypto.New()
@@ -67,6 +104,7 @@ func TestInteropWithLocalJoseEncryptAndGoJoseDecrypt(t *testing.T) {
 	serializedJWE, err := jwe.FullSerialize(json.Marshal)
 	require.NoError(t, err)
 
+	fmt.Printf("JSONWebEncryption => \n%s\n", serializedJWE)
 	// 使用 jose 库反序列化 JSON Web Encryption 对象
 	gjParsedJWE, err := jose.ParseEncrypted(serializedJWE)
 	require.NoError(t, err)
@@ -203,4 +241,49 @@ func getPrintedX25519PubKey(t *testing.T, pubKey *spicrypto.PublicKey) string {
 	require.NoError(t, err)
 
 	return strings.Replace(jwkStr, "Ed25519", "X25519", 1)
+}
+
+func convertToGoJoseRecipients(t *testing.T, keys []*spicrypto.PublicKey,
+	kids []string) []jose.Recipient {
+	t.Helper()
+
+	var joseRecipients []jose.Recipient
+
+	for i, key := range keys {
+		c := tinksubtle.GetCurve(key.Curve)
+		gjKey := jose.Recipient{
+			KeyID:     kids[i],
+			Algorithm: jose.ECDH_ES_A256KW,
+			Key: &ecdsa.PublicKey{
+				Curve: c,
+				X:     new(big.Int).SetBytes(key.X),
+				Y:     new(big.Int).SetBytes(key.Y),
+			},
+		}
+
+		joseRecipients = append(joseRecipients, gjKey)
+	}
+
+	return joseRecipients
+}
+
+func createCryptoAndKMSServices(t *testing.T, keys map[string]*keyset.Handle) (
+	spicrypto.Crypto, spikms.KeyManager) {
+	c, err := tinkcrypto.New()
+	require.NoError(t, err)
+
+	k := &mockKMSGetter{
+		keys: keys,
+	}
+
+	return c, k
+}
+
+type mockKMSGetter struct {
+	mockkms.KeyManager
+	keys map[string]*keyset.Handle
+}
+
+func (k *mockKMSGetter) Get(kid string) (interface{}, error) {
+	return k.keys[kid], nil
 }

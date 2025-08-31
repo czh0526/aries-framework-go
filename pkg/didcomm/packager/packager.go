@@ -11,6 +11,8 @@ import (
 	"github.com/czh0526/aries-framework-go/component/models/did"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer/authcrypt"
+	legacyauthcrypt "github.com/czh0526/aries-framework-go/pkg/didcomm/packer/legacy/authcrypt"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -19,7 +21,7 @@ import (
 )
 
 const (
-	authSuffix                 = "authcrypt"
+	authSuffix                 = "-authcrypt"
 	jsonWebKey2020             = "jsonWebKey2020"
 	x25519KeyAgreementKey2019  = "X25519KeyAgreementKey2019"
 	ed25519VerificationKey2018 = "Ed25519VerificationKey2018"
@@ -100,7 +102,7 @@ func (p *Packager) getCTYAndPacker(envelope *transport.Envelope) (string, packer
 
 func addAuthcryptSuffix(fromKey []byte, packerName string) string {
 	if len(fromKey) > 0 {
-		packerName = authSuffix
+		packerName += authSuffix
 	}
 	return packerName
 }
@@ -289,6 +291,10 @@ func New(p Provider) (*Packager, error) {
 		vdrRegistry:   p.VDRegistry(),
 	}
 
+	for _, packerType := range p.Packers() {
+		basePackager.addPacker(packerType)
+	}
+
 	basePackager.primaryPacker = p.PrimaryPacker()
 	if basePackager.primaryPacker == nil {
 		return nil, fmt.Errorf("need primary packer to initialize packager")
@@ -301,6 +307,13 @@ func New(p Provider) (*Packager, error) {
 
 func (p *Packager) addPacker(pack packer.Packer) {
 	packerID := pack.EncodingType()
+
+	_, isAuthCrypt := pack.(*authcrypt.Packer)
+	_, isLegacyAuthCrypt := pack.(*legacyauthcrypt.Packer)
+
+	if isAuthCrypt || isLegacyAuthCrypt {
+		packerID += authSuffix
+	}
 
 	if p.packers[packerID] == nil {
 		p.packers[packerID] = pack

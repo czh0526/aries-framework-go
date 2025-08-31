@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	comp_jose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	aries_jose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/kidresolver"
 	resolver "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/kidresolver"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
@@ -23,12 +23,12 @@ var logger = log.New("aries-framework.pkg/didcomm/packer/authcrypt")
 
 type Packer struct {
 	kms           spikms.KeyManager
-	encAlg        comp_jose.EncAlg
+	encAlg        aries_jose.EncAlg
 	cryptoService spicrypto.Crypto
 	kidResolvers  []kidresolver.KIDResolver
 }
 
-func New(ctx packer.Provider, encAlg comp_jose.EncAlg) (*Packer, error) {
+func New(ctx packer.Provider, encAlg aries_jose.EncAlg) (*Packer, error) {
 	err := validateEncAlg(encAlg)
 	if err != nil {
 		return nil, fmt.Errorf("authcrypt: %w", err)
@@ -94,7 +94,7 @@ func (p *Packer) Pack(contentType string, payload []byte, senderID []byte, recip
 		sKH = nil
 	}
 
-	jweEncrypter, err := comp_jose.NewJWEEncrypt(p.encAlg, p.EncodingType(),
+	jweEncrypter, err := aries_jose.NewJWEEncrypt(p.encAlg, p.EncodingType(),
 		contentType, skid, sKH, recECKeys, p.cryptoService)
 	if err != nil {
 		return nil, fmt.Errorf("authcrypt Pack: failed to new JWEEncrypt instance: %w", err)
@@ -162,13 +162,87 @@ func (p *Packer) Unpack(envelope []byte) (*transport.Envelope, error) {
 			return nil, fmt.Errorf("authcrypt Unpack: failed to get key from kms: %w", err)
 		}
 
-		jweDecrypter := comp_jose.NewJWEDecrypt(p.kidResolvers, p.cryptoService, p.kms)
+		jweDecrypter := aries_jose.NewJWEDecrypt(p.kidResolvers, p.cryptoService, p.kms)
+
+		pt, err = jweDecrypter.Decrypt(jwe)
+		if err != nil {
+			return nil, fmt.Errorf("authcrypt Unpack: failed to decrypt JWE envelope: %w", err)
+		}
+
+		env, err = p.buildEnvelope(recKey, recKID, pt, jwe)
+		if err != nil {
+			return nil, fmt.Errorf("authcrypt Unpack: %w", err)
+		}
+
+		return env, nil
 	}
 
 	return nil, fmt.Errorf("authcrypt Unpack: no matching recipient in envelope")
 }
 
-func (p *Packer) pubKey(i int, jwe *comp_jose.JSONWebEncryption) (*spicrypto.PublicKey, string, error) {
+func (p *Packer) buildEnvelope(recKey *spicrypto.PublicKey, recKID string, message []byte,
+	jwe *aries_jose.JSONWebEncryption) (*transport.Envelope, error) {
+	recKey.KID = recKID
+
+	ecdh1puPubKeyBytes, err := json.Marshal(recKey)
+	if err != nil {
+		return nil, fmt.Errorf("buildEnvelope: failed to marshal recipient public key: %w", err)
+	}
+
+	mSenderPubKey, err := p.extractSenderKey(jwe)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transport.Envelope{
+		Message: message,
+		FromKey: mSenderPubKey,
+		ToKey:   ecdh1puPubKeyBytes,
+	}, nil
+}
+
+func (p *Packer) extractSenderKey(jwe *aries_jose.JSONWebEncryption) ([]byte, error) {
+	var (
+		senderKey     *spicrypto.PublicKey
+		mSenderPubKey []byte
+		err           error
+	)
+
+	skidHeader, ok := jwe.ProtectedHeaders["skid"]
+	if ok {
+		skid, ok := skidHeader.(string)
+		if ok {
+			for _, r := range p.kidResolvers {
+				senderKey, err = r.Resolve(skid)
+				if err != nil {
+					logger.Debugf("authcrypt Unpack: unpack successful, but resolving sender key failed [%v] "+
+						"using %T resolver, skipping it.", err.Error(), r)
+				}
+
+				if senderKey != nil {
+					logger.Debugf("authcrypt Unpack: unpack successful with resolving sender key success "+
+						"using %T resolver, will be using resolved senderKey for skid: %v", r, skid)
+					break
+				}
+			}
+
+			if senderKey != nil {
+				senderKey.KID = skid
+				mSenderPubKey, err = json.Marshal(senderKey)
+
+				if err != nil {
+					return nil, fmt.Errorf("authcrypt Unpack: failed to marshal sender public key: %w", err)
+				}
+			} else {
+				logger.Debugf("authcrypt Unpack: senderKey not resolved, skipping FromKey in envelope")
+			}
+		}
+	}
+
+	return mSenderPubKey, nil
+}
+
+func (p *Packer) pubKey(i int, jwe *aries_jose.JSONWebEncryption) (*spicrypto.PublicKey, string, error) {
 	var (
 		kid         string
 		kidResolver resolver.KIDResolver
@@ -205,7 +279,7 @@ func (p *Packer) pubKey(i int, jwe *comp_jose.JSONWebEncryption) (*spicrypto.Pub
 	return recKey, kid, nil
 }
 
-func validateEncAlg(alg comp_jose.EncAlg) error {
+func validateEncAlg(alg aries_jose.EncAlg) error {
 	switch alg {
 	case jose.A128CBCHS256, jose.A192CBCHS384, jose.A256CBCHS384, jose.A256CBCHS512, jose.XC20P:
 		return nil
@@ -234,8 +308,8 @@ func unmarshalRecipientKeys(keys [][]byte) ([]*spicrypto.PublicKey, []byte, erro
 	return pubKeys, aad, nil
 }
 
-func deserializeEnvelope(envelope []byte) (*comp_jose.JSONWebEncryption, string, string, error) {
-	jwe, err := comp_jose.Deserialize(string(envelope))
+func deserializeEnvelope(envelope []byte) (*aries_jose.JSONWebEncryption, string, string, error) {
+	jwe, err := aries_jose.Deserialize(string(envelope))
 	if err != nil {
 		return nil, "", "", fmt.Errorf("authcrypt Unpack: failed to deserialize JWE message: %w", err)
 	}

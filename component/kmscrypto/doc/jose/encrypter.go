@@ -274,7 +274,7 @@ func (je *JWEEncrypt) encodeAPUAPV(kek *spicrypto.RecipientWrappedKey) {
 	if len(kek.APV) > 0 {
 		apvBytes := make([]byte, len(kek.APV))
 		copy(apvBytes, kek.APV)
-		kek.APV = make([]byte, base64.RawURLEncoding.DecodedLen(len(apvBytes)))
+		kek.APV = make([]byte, base64.RawURLEncoding.EncodedLen(len(apvBytes)))
 		base64.RawURLEncoding.Encode(kek.APV, apvBytes)
 	}
 }

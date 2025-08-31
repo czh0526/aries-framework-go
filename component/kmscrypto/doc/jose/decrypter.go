@@ -144,7 +144,7 @@ func (jd *JWEDecrypt) resolveKID(kid string) (*spicrypto.PublicKey, error) {
 
 	for _, resolver := range jd.kidResolvers {
 		rKID, err := resolver.Resolve(kid)
-		if err != nil {
+		if err == nil {
 			return rKID, nil
 		}
 

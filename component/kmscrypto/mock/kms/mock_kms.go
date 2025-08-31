@@ -88,7 +88,7 @@ func (k *KeyManager) PubKeyBytesToHandle(pubKey []byte, keyType spikms.KeyType,
 	return k.PubKeyBytesToHandleValue, nil
 }
 
-func (k *KeyManager) ImportPrivateKey(privKey interface{}, opts ...spikms.PrivateKeyOpts) (
+func (k *KeyManager) ImportPrivateKey(privKey interface{}, kt spikms.KeyType, opts ...spikms.PrivateKeyOpts) (
 	string, interface{}, error) {
 	if k.ImportPrivateKeyErr != nil {
 		return "", nil, k.ImportPrivateKeyErr

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -15,6 +16,19 @@ const (
 var (
 	errWrongNumberOfCompactJWEParts = errors.New("invalid compact JWE: it must have five parts")
 	errEmptyCiphertext              = errors.New("ciphertext cannot be empty")
+	errProtectedHeaderMissing       = errors.New(errCompactSerializationCommonText +
+		"no protected header found")
+	errNotOnlyOneRecipient = errors.New(errCompactSerializationCommonText +
+		"JWE compact serialization only supports JWE with exactly one single recipient")
+
+	errUnprotectedHeaderUnsupported = errors.New(errCompactSerializationCommonText +
+		"JWE compact serialization does not support a shared unprotected header")
+
+	errAADHeaderUnsupported = errors.New(errCompactSerializationCommonText +
+		"JWE compact serialization does not support AAD")
+
+	errPerRecipientHeaderUnsupported = errors.New(errCompactSerializationCommonText +
+		"JWE compact serialization does not support a per-recipient unprotected header")
 )
 
 type RecipientHeaders struct {
@@ -86,6 +100,46 @@ func (e *JSONWebEncryption) FullSerialize(marshal marshalFunc) (string, error) {
 	}
 
 	return string(serializedJWE), nil
+}
+
+func (e *JSONWebEncryption) CompactSerialize(marshal marshalFunc) (string, error) {
+	if e.ProtectedHeaders == nil {
+		return "", errProtectedHeaderMissing
+	}
+
+	if len(e.Recipients) != 1 {
+		return "", errNotOnlyOneRecipient
+	}
+
+	if e.UnprotectedHeaders != nil {
+		return "", errUnprotectedHeaderUnsupported
+	}
+
+	if e.AAD != "" {
+		return "", errAADHeaderUnsupported
+	}
+
+	if e.Recipients[0].Header != nil {
+		return "", errPerRecipientHeaderUnsupported
+	}
+
+	protectedHeadersJSON, err := marshal(e.ProtectedHeaders)
+	if err != nil {
+		return "", err
+	}
+
+	b64ProtectedHeader := base64.RawURLEncoding.EncodeToString(protectedHeadersJSON)
+	b64EncryptedKey := base64.RawURLEncoding.EncodeToString([]byte(e.Recipients[0].EncryptedKey))
+	b64IV := base64.RawURLEncoding.EncodeToString([]byte(e.IV))
+	b64Ciphertext := base64.RawURLEncoding.EncodeToString([]byte(e.Ciphertext))
+	b64Tag := base64.RawURLEncoding.EncodeToString([]byte(e.Tag))
+
+	return fmt.Sprintf("%s.%s.%s.%s.%s",
+		b64ProtectedHeader,
+		b64EncryptedKey,
+		b64IV,
+		b64Ciphertext,
+		b64Tag), nil
 }
 
 func (e *JSONWebEncryption) prepareHeaders(marshal marshalFunc) (string, json.RawMessage, error) {
