@@ -44,11 +44,6 @@ func (V VDR) Deactivate(did string, opts ...vdr.DIDMethodOption) error {
 	panic("implement me")
 }
 
-func (V VDR) Close() error {
-	//TODO implement me
-	panic("implement me")
-}
-
 func New(p spistorage.Provider) (*VDR, error) {
 	didDBStore, err := p.OpenStore(StoreNamespace)
 	if err != nil {

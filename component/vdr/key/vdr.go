@@ -34,8 +34,7 @@ func (V VDR) Deactivate(did string, opts ...vdr.DIDMethodOption) error {
 }
 
 func (V VDR) Close() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func New() *VDR {

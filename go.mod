@@ -17,7 +17,9 @@ require (
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20250704110927-1a7734733494
 	github.com/go-jose/go-jose v2.6.3+incompatible
+	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/piprate/json-gold v0.5.0
+	github.com/rs/cors v1.11.1
 	github.com/tink-crypto/tink-go/v2 v2.4.0
 	golang.org/x/crypto v0.35.0
 	google.golang.org/protobuf v1.36.6
@@ -29,7 +31,6 @@ require (
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.9.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/hyperledger/fabric-amcl v0.0.0-20210603140002-2670f91851c8 // indirect

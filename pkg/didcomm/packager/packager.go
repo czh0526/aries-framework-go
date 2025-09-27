@@ -1,9 +1,14 @@
 package packager
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
+
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk/jwksupport"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
@@ -16,13 +21,11 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	"log"
-	"strings"
 )
 
 const (
 	authSuffix                 = "-authcrypt"
-	jsonWebKey2020             = "jsonWebKey2020"
+	jsonWebKey2020             = "JsonWebKey2020"
 	x25519KeyAgreementKey2019  = "X25519KeyAgreementKey2019"
 	ed25519VerificationKey2018 = "Ed25519VerificationKey2018"
 )
@@ -63,8 +66,111 @@ func (p *Packager) PackMessage(envelope *transport.Envelope) ([]byte, error) {
 }
 
 func (p *Packager) UnpackMessage(encMessage []byte) (*transport.Envelope, error) {
-	//TODO implement me
-	panic("implement me")
+	encType, b64DecodeMessage, err := getEncodingType(encMessage)
+	if err != nil {
+		return nil, fmt.Errorf("getEncodingType: %w", err)
+	}
+
+	pack, ok := p.packers[encType]
+	if !ok {
+		return nil, fmt.Errorf("message type `%s` is not supported", encType)
+	}
+
+	if len(b64DecodeMessage) > 0 {
+		encMessage = b64DecodeMessage
+	}
+
+	envelope, err := pack.Unpack(encMessage)
+	if err != nil {
+		return nil, fmt.Errorf("unpack: %w", err)
+	}
+
+	return envelope, nil
+}
+
+type envelopeStub struct {
+	Protected string `json:"protected,omitempty"`
+}
+
+type headerStub struct {
+	Type string `json:"typ,omitempty"`
+	SKID string `json:"skid,omitempty"`
+	Alg  string `json:"alg,omitempty"`
+}
+
+func getEncodingType(encMessage []byte) (string, []byte, error) {
+	var b64DecodedMessage []byte
+
+	env := &envelopeStub{}
+
+	if strings.HasPrefix(string(encMessage), "{") {
+		err := json.Unmarshal(encMessage, env)
+		if err != nil {
+			return "", nil, fmt.Errorf("parse envelope: %w", err)
+		}
+	} else {
+		doubleQuote := []byte("\"")
+
+		// packed message is base64 encoded and double-quoted.
+		if bytes.HasPrefix(encMessage, doubleQuote) && bytes.HasSuffix(encMessage, doubleQuote) {
+			msg := string(encMessage[1 : len(encMessage)-1])
+			var encodedEnvelope []byte
+
+			protBytes1, err1 := base64.URLEncoding.DecodeString(msg)
+			protBytes2, err2 := base64.RawURLEncoding.DecodeString(msg)
+
+			switch {
+			case err1 == nil:
+				encodedEnvelope = protBytes1
+			case err2 == nil:
+				encodedEnvelope = protBytes2
+			default:
+				return "", nil, fmt.Errorf("decode wrapped header: URLEncoding error: %w, RawURLEncoding error: %v",
+					err1, err2)
+			}
+
+			if bytes.HasPrefix(encodedEnvelope, []byte("{")) {
+				err := json.Unmarshal(encodedEnvelope, env)
+				if err != nil {
+					return "", nil, fmt.Errorf("parse wrapped envelope: %w", err)
+				}
+			} else { // compact serialized
+				env.Protected = strings.Split(string(encodedEnvelope), ".")[0]
+			}
+
+			b64DecodedMessage = encodedEnvelope
+		} else { // compact serialized
+			env.Protected = strings.Split(string(encMessage), ".")[0]
+		}
+	}
+
+	var proBytes []byte
+	proBytes1, err1 := base64.URLEncoding.DecodeString(env.Protected)
+	proBytes2, err2 := base64.RawURLEncoding.DecodeString(env.Protected)
+
+	switch {
+	case err1 == nil:
+		proBytes = proBytes1
+	case err2 == nil:
+		proBytes = proBytes2
+	default:
+		return "", nil, fmt.Errorf("decode wrapped header: URLEncoding error: %w, RawURLEncoding error: %v",
+			err1, err2)
+	}
+
+	prot := &headerStub{}
+
+	err := json.Unmarshal(proBytes, prot)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse wrapped header: %w", err)
+	}
+
+	packerID := prot.Type
+	if prot.SKID != "" || prot.Alg == "Authcrypt" {
+		packerID += authSuffix
+	}
+
+	return packerID, b64DecodedMessage, nil
 }
 
 func (p *Packager) getCTYAndPacker(envelope *transport.Envelope) (string, packer.Packer, error) {

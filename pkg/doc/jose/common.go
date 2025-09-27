@@ -1,5 +1,7 @@
 package jose
 
+import "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+
 const (
 	A256GCMALG      = "A256GCM"
 	XC20PALG        = "XC20P"
@@ -11,3 +13,5 @@ const (
 	// A256CBCHS512ALG represents AES_256_CBC_HMAC_SHA_512 encryption algorithm value.
 	A256CBCHS512ALG = "A256CBC-HS512"
 )
+
+type Headers = jose.Headers

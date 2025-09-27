@@ -38,6 +38,7 @@ func TestNewPackagerMissingPrimaryPacker(t *testing.T) {
 	require.EqualError(t, err, "need primary packer to initialize packager")
 }
 
+// 测试各种 Key 类型
 func TestBaseKMSInPackager_UnpackMessage(t *testing.T) {
 	cryptoSvc, err := tinkcrypto.New()
 	require.NoError(t, err)
@@ -55,18 +56,18 @@ func TestBaseKMSInPackager_UnpackMessage(t *testing.T) {
 				name:    "Pack/Unpack success with P-256 ECDH HW keys",
 				keyType: spikms.NISTP256ECDHKWType,
 			},
-			//{
-			//	name:    "Pack/Unpack success with P-384 ECDH KW keys",
-			//	keyType: spikms.NISTP384ECDHKWType,
-			//},
-			//{
-			//	name:    "Pack/Unpack success with P-521 ECDH KW keys",
-			//	keyType: spikms.NISTP521ECDHKWType,
-			//},
-			//{
-			//	name:    "Pack/Unpack success with X25519 ECDH KW keys",
-			//	keyType: spikms.X25519ECDHKWType,
-			//},
+			{
+				name:    "Pack/Unpack success with P-384 ECDH KW keys",
+				keyType: spikms.NISTP384ECDHKWType,
+			},
+			{
+				name:    "Pack/Unpack success with P-521 ECDH KW keys",
+				keyType: spikms.NISTP521ECDHKWType,
+			},
+			{
+				name:    "Pack/Unpack success with X25519 ECDH KW keys",
+				keyType: spikms.X25519ECDHKWType,
+			},
 		}
 
 		for _, tt := range tests {
@@ -77,6 +78,7 @@ func TestBaseKMSInPackager_UnpackMessage(t *testing.T) {
 	})
 }
 
+// packUnpackSuccess 测试各种信封类型
 func packUnpackSuccess(keyType spikms.KeyType, customKMS spikms.KeyManager, cryptoSvc spicrypto.Crypto, t *testing.T) {
 	resolveDIDFunc, fromDIDKey, toDIDKey, fromDID, toDID := newDIDsAndDIDDocResolverFunc(
 		customKMS, keyType, t)

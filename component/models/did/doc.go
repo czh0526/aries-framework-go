@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+const (
+	ContextV1 = "https://www.w3,org/ns/did/v1"
+)
+
 type Context interface{}
 
 type processingMeta struct {
@@ -17,7 +21,7 @@ type Doc struct {
 	VerificationMethod   []VerificationMethod
 	Service              []Service
 	Authentication       []Verification
-	AssertMethod         []Verification
+	AssertionMethod      []Verification
 	CapabilityDelegation []Verification
 	CapabilityInvocation []Verification
 	KeyAgreement         []Verification
@@ -25,6 +29,13 @@ type Doc struct {
 	Updated              *time.Time
 	Proof                []Proof
 	processingMeta       processingMeta
+}
+
+func (doc *Doc) JSONBytes() ([]byte, error) {
+	context, ok := ContextPeekString(doc.Context)
+	if !ok {
+		context = ContextV1
+	}
 }
 
 type DocResolution struct {

@@ -593,7 +593,7 @@ func (je *JWEEncrypt) okpEPKAndAlg() (*spicrypto.PrivateKey, string, error) {
 		return nil, "", fmt.Errorf("okpEPKAndAlg: generate public key for OKP: %w", err)
 	}
 
-	kwAlg := tinkcrypto.ECDH1PUA128KWAlg
+	kwAlg := tinkcrypto.ECDH1PUXC20PKWAlg
 
 	epk := &spicrypto.PrivateKey{
 		PublicKey: spicrypto.PublicKey{

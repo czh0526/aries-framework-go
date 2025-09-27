@@ -8,3 +8,11 @@ type ProtocolService interface {
 	Name() string
 	Initialize(interface{}) error
 }
+
+type Outbound interface {
+	Send(interface{}, string, *service.Destination) error
+
+	SendToDID(msg interface{}, myDID, theirDID string) error
+
+	Forward(interface{}, *service.Destination) error
+}

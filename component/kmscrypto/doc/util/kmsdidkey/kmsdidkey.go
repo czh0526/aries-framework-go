@@ -4,6 +4,7 @@ import (
 	"crypto/elliptic"
 	"encoding/json"
 	"fmt"
+	"github.com/btcsuite/btcutil/base58"
 	comp_crypto "github.com/czh0526/aries-framework-go/component/kmscrypto/crypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/fingerprint"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
@@ -205,4 +206,13 @@ func unmarshalECKey(ecCRV elliptic.Curve, pubKey []byte) (string, []byte, []byte
 	}
 
 	return ecCurves[ecCRV], x, y, pubKey
+}
+
+func GetBase58PubKeyFromDIDKey(didKey string) (string, error) {
+	key, err := EncryptionPubKeyFromDIDKey(didKey)
+	if err != nil {
+		return "", fmt.Errorf("GetBase58PubKeyFromDIDKey failed to parse public key bytes from %s: %w", didKey, err)
+	}
+
+	return base58.Encode(key.X), nil
 }

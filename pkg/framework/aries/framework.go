@@ -8,12 +8,15 @@ import (
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/component/vdr/key"
 	"github.com/czh0526/aries-framework-go/component/vdr/peer"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/outbound"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packager"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
+	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 	"github.com/google/uuid"
 	jsonld "github.com/piprate/json-gold/ld"
@@ -39,6 +42,9 @@ type Aries struct {
 	packerCreators      []packer.Creator
 	packagerCreator     packager.Creator
 	mediaTypeProfiles   []string
+	outboundDispatcher  dispatcher.Outbound
+	outboundTransports  []transport.OutboundTransport
+	inboundTransports   []transport.InboundTransport
 }
 
 type Option func(opts *Aries) error
@@ -66,6 +72,39 @@ func New(opts ...Option) (*Aries, error) {
 	return initializeServices(aries)
 }
 
+func (a *Aries) Context() (*context.Provider, error) {
+	return context.New(
+		context.WithKMS(a.kms),
+		context.WithCrypto(a.crypto))
+}
+
+func (a *Aries) Close() error {
+	if a.storeProvider != nil {
+		err := a.storeProvider.Close()
+		if err != nil {
+			return fmt.Errorf("close store provider failed: %w", err)
+		}
+	}
+
+	for _, inbound := range a.inboundTransports {
+		if err := inbound.Stop(); err != nil {
+			return fmt.Errorf("stop inbound transport failed: %w", err)
+		}
+	}
+
+	return a.closeVDR()
+}
+
+func (a *Aries) closeVDR() error {
+	if a.vdrRegistry != nil {
+		if err := a.vdrRegistry.Close(); err != nil {
+			return fmt.Errorf("close vdr registry failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func initializeServices(aries *Aries) (*Aries, error) {
 	if err := createKMS(aries); err != nil {
 		return nil, err
@@ -79,14 +118,51 @@ func initializeServices(aries *Aries) (*Aries, error) {
 		return nil, err
 	}
 
+	if err := createOutboundDispatcher(aries); err != nil {
+		return nil, err
+	}
+
 	//if err := loadServices(aries); err != nil {
 	//	return nil, err
 	//}
 
+	if err := startTransports(aries); err != nil {
+		return nil, err
+	}
+
 	return aries, nil
 }
 
-type kmsProvider struct{}
+func startTransports(aries *Aries) error {
+	ctx, err := context.New()
+
+	for _, inbound := range aries.inboundTransports {
+		if err = inbound.Start(ctx); err != nil {
+			return fmt.Errorf("inbound transport start failed: %w", err)
+		}
+	}
+
+	for _, outbound := range aries.outboundTransports {
+		if err = outbound.Start(ctx); err != nil {
+			return fmt.Errorf("outbound transport start failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+type kmsProvider struct {
+	kmsStore          spikms.Store
+	secretLockService spisecretlock.Service
+}
+
+func (k *kmsProvider) StorageProvider() spikms.Store {
+	return k.kmsStore
+}
+
+func (k *kmsProvider) SecretLock() spisecretlock.Service {
+	return k.secretLockService
+}
 
 func WithKMS(creator spikms.Creator) Option {
 	return func(aries *Aries) error {
@@ -95,9 +171,34 @@ func WithKMS(creator spikms.Creator) Option {
 	}
 }
 
+func WithInboundTransport(inboundTransport ...transport.InboundTransport) Option {
+	return func(aries *Aries) error {
+		aries.inboundTransports = append(aries.inboundTransports, inboundTransport...)
+		return nil
+	}
+}
+
 func WithCrypto(c spicrypto.Crypto) Option {
 	return func(aries *Aries) error {
 		aries.crypto = c
+		return nil
+	}
+}
+
+func WithPacker(primary packer.Creator, additionalPackers ...packer.Creator) Option {
+	return func(aries *Aries) error {
+		aries.packerCreator = primary
+		aries.packerCreators = append(aries.packerCreators, additionalPackers...)
+
+		return nil
+	}
+}
+
+func WithMediaTypeProfiles(mediaTypeProfiles []string) Option {
+	return func(aries *Aries) error {
+		aries.mediaTypeProfiles = make([]string, len(mediaTypeProfiles))
+		copy(aries.mediaTypeProfiles, mediaTypeProfiles)
+
 		return nil
 	}
 }
@@ -227,4 +328,8 @@ func fetchEndpoint(aries *Aries, defaultScheme string) string {
 
 func createPackersAndPackager(aries *Aries) error {
 	return nil
+}
+
+func createOutboundDispatcher(aries *Aries) error {
+	aries.outboundDispatcher, err = outbound.NewOutbound(ctx)
 }

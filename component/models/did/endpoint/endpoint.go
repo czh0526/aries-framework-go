@@ -1,5 +1,7 @@
 package endpoint
 
+import "fmt"
+
 type EndpointType int
 
 const (
@@ -20,6 +22,69 @@ type Endpoint struct {
 	rawDIDCommV1 string
 	rawObj       interface{}
 }
+
+func (e *Endpoint) URI() (string, error) {
+	if len(e.rawDIDCommV2) > 0 {
+		return e.rawDIDCommV2[0].URI, nil
+	}
+
+	if e.rawDIDCommV1 != "" {
+		return stripQuotes(e.rawDIDCommV1), nil
+	}
+
+	if e.rawObj != nil {
+		switch o := e.rawObj.(type) {
+		case []string:
+			return o[0], nil
+		case [][]byte:
+			return string(o[0]), nil
+		case []interface{}:
+			return fmt.Sprintf("%s", o[0]), nil
+		case map[string]interface{}:
+			switch uri := o["origins"].(type) {
+			case []interface{}:
+				return fmt.Sprintf("%s", uri[0]), nil
+			default:
+				return "", fmt.Errorf("unexpected DIDCore origins object: %s", o)
+			}
+
+		default:
+			return "", fmt.Errorf("unrecognized DIDCore endpoint object %s", o)
+		}
+	}
+
+	return "", fmt.Errorf("endpoint URI not found")
+}
+
+func (e *Endpoint) Accept() ([]string, error) {
+	if len(e.rawDIDCommV2) > 0 {
+		return e.rawDIDCommV2[0].Accept, nil
+	}
+
+	return nil, fmt.Errorf("endpoint Accept not found")
+}
+
+func (e *Endpoint) Type() EndpointType {
+	if len(e.rawDIDCommV2) > 0 {
+		return DIDCommV2
+	}
+
+	if e.rawDIDCommV1 != "" {
+		return DIDCommV1
+	}
+
+	return Generic
+}
+
+func (e *Endpoint) RoutingKeys() ([]string, error) {
+	if len(e.rawDIDCommV2) > 0 {
+		return e.rawDIDCommV2[0].RoutingKeys, nil
+	}
+
+	return nil, fmt.Errorf("endpoint RoutingKeys not found")
+}
+
+var _ ServiceEndpoint = (*Endpoint)(nil)
 
 type DIDCommV2Endpoint struct {
 	URI         string   `json:"uri"`
@@ -49,14 +114,16 @@ func NewDIDCoreEndpoint(genericEndpoint interface{}) Endpoint {
 	}
 }
 
-func (e *Endpoint) Type() EndpointType {
-	if len(e.rawDIDCommV2) > 0 {
-		return DIDCommV2
+func stripQuotes(str string) string {
+	if len(str) > 0 {
+		if str[0] == '"' {
+			str = str[1:]
+		}
+
+		if str[len(str)-1] == '"' {
+			str = str[:len(str)-1]
+		}
 	}
 
-	if e.rawDIDCommV1 != "" {
-		return DIDCommV1
-	}
-
-	return Generic
+	return str
 }
