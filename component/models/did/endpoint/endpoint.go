@@ -1,6 +1,9 @@
 package endpoint
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type EndpointType int
 
@@ -82,6 +85,22 @@ func (e *Endpoint) RoutingKeys() ([]string, error) {
 	}
 
 	return nil, fmt.Errorf("endpoint RoutingKeys not found")
+}
+
+func (s *Endpoint) MarshalJSON() ([]byte, error) {
+	if len(s.rawDIDCommV2) > 0 {
+		return json.Marshal(s.rawDIDCommV2)
+	}
+
+	if s.rawDIDCommV1 != "" {
+		return []byte(fmt.Sprintf("%q", s.rawDIDCommV1)), nil
+	}
+
+	if s.rawObj != nil {
+		return json.Marshal(s.rawObj)
+	}
+
+	return []byte("null"), nil
 }
 
 var _ ServiceEndpoint = (*Endpoint)(nil)

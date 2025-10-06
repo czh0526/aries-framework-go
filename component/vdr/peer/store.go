@@ -26,13 +26,13 @@ type docDelta struct {
 func genesisDeltaBytes(doc *didmodel.Doc, by *[]modifiedBy) ([]byte, error) {
 	var deltas []docDelta
 
-	jsonDoc, err :== doc.JSONBytes()
+	jsonDoc, err := doc.JSONBytes()
 	if err != nil {
 		return nil, fmt.Errorf("JSON marshalling of document failed: %w", err)
 	}
 
-	docDelta := &docDelta {
-		Change: base64.URLEncoding.EncodeToString(jsonDoc),
+	docDelta := &docDelta{
+		Change:     base64.URLEncoding.EncodeToString(jsonDoc),
 		ModifiedBy: by,
 		ModifiedAt: time.Now(),
 	}
@@ -44,7 +44,7 @@ func genesisDeltaBytes(doc *didmodel.Doc, by *[]modifiedBy) ([]byte, error) {
 		return nil, fmt.Errorf("JSON marshalling of document deltas failed: %w", err)
 	}
 
-	return val, nil 
+	return val, nil
 }
 
 func UnsignedGenesisDelta(doc *didmodel.Doc) (string, error) {

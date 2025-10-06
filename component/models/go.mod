@@ -3,11 +3,14 @@ module github.com/czh0526/aries-framework-go/component/models
 go 1.23.7
 
 require (
+	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20250704101502-9a775bcd4677
+	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/piprate/json-gold v0.5.0
 	github.com/stretchr/testify v1.10.0
+	github.com/xeipuuv/gojsonschema v1.2.0
 )
 
 require (
@@ -25,7 +28,10 @@ require (
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
+	github.com/teserakt-io/golang-ed25519 v0.0.0-20210104091850-3888c087a4c8 // indirect
 	github.com/tink-crypto/tink-go/v2 v2.4.0 // indirect
+	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
@@ -34,6 +40,6 @@ require (
 )
 
 replace (
-	github.com/czh0526/aries-framework-go/spi => ../../spi
 	github.com/czh0526/aries-framework-go/component/kmscrypto => ../kmscrypto
+	github.com/czh0526/aries-framework-go/spi => ../../spi
 )

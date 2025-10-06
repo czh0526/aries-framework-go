@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	jsonWebKey2020             = "JsonWbKey2020"
+	jsonWebKey2020             = "JSONWebKey2020"
 	jwsVerificationKey2020     = "JwsVerificationKey2020"
 	ed25519VerificationKey2018 = "Ed25519VerificationKey2018"
 )

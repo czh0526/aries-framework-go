@@ -17,7 +17,7 @@ func (d *DID) String() string {
 }
 
 func Parse(did string) (*DID, error) {
-	const idchar = `a-zA-Z0-9_-\.`
+	const idchar = `a-zA-Z0-9-_\.`
 	regex := fmt.Sprintf(`^did:[a-z0-9]+:(:+|[:%s]+)*[%%:%s]+[^:]$`, idchar, idchar)
 
 	r, err := regexp.Compile(regex)

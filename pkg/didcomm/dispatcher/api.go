@@ -9,6 +9,12 @@ type ProtocolService interface {
 	Initialize(interface{}) error
 }
 
+type MessageService interface {
+	service.InboundHandler
+	Accept(msgType string, purpose []string) bool
+	Name() string
+}
+
 type Outbound interface {
 	Send(interface{}, string, *service.Destination) error
 

@@ -54,3 +54,12 @@ type Messenger interface {
 
 	SendToDestination(msg DIDCommMsgMap, sender string, destination *Destination, opts ...Opt) error
 }
+
+type InboundMessenger interface {
+	HandleInbound(msg DIDCommMsgMap, ctx DIDCommContext) error
+}
+
+type MessengerHandler interface {
+	Messenger
+	InboundMessenger
+}

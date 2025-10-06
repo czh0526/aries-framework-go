@@ -109,12 +109,106 @@ func TestDIDCommMessageMiddleware_handleInboundRotate(t *testing.T) {
 
 	rotateMessage := sender.HandleOutboundMessage(blankMessage.Clone(), senderConnRec)
 
-	t.Run("failed: can't rotate without prior connection", func(t *testing.T) {
+	t.Run("fail: can't rotate without prior connection", func(t *testing.T) {
 		recip := createBlankDIDRotator(t)
 
 		_, _, err := recip.handleInboundRotate(rotateMessage, newDID, theirDID, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "inbound message cannot rotate without an existing prior connection")
+	})
+
+	t.Run("fail: error reading connection record", func(t *testing.T) {
+		recip := createBlankDIDRotator(t)
+
+		connStore, err := connection.NewRecorder(&mockProvider{
+			storeProvider: mockstorage.NewCustomMockStoreProvider(&mockstorage.MockStore{
+				ErrQuery: fmt.Errorf("store error"),
+				ErrGet:   fmt.Errorf("store error"),
+			}),
+		})
+		require.NoError(t, err)
+
+		recip.connStore = connStore
+		_, _, err = recip.handleInboundRotate(rotateMessage, newDID, theirDID, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "looking up did rotation connection record")
+	})
+
+	t.Run("fail: from_prior JWS validation error", func(t *testing.T) {
+		recip := createBlankDIDRotator(t)
+
+		err := recip.connStore.SaveConnectionRecord(&connection.Record{
+			ConnectionID: senderConnID,
+			State:        connection.StateNameCompleted,
+			TheirDID:     myDID,
+			MyDID:        theirDID,
+			Namespace:    connection.MyNSPrefix,
+		})
+		require.NoError(t, err)
+
+		_, _, err = recip.handleInboundRotate(rotateMessage, newDID, theirDID, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "`from_prior` validation")
+	})
+
+	t.Run("fail: recipient rotated, but received message addressed to wrong DID", func(t *testing.T) {
+		handler := createBlankDIDRotator(t)
+
+		connRec := &connection.Record{
+			ConnectionID: uuid.New().String(),
+			State:        connection.StateNameCompleted,
+			TheirDID:     myDID,
+			MyDID:        theirDID,
+			Namespace:    connection.MyNSPrefix,
+			MyDIDRotation: &connection.DIDRotationRecord{
+				OldDID:    "did:test:recipient-old",
+				NewDID:    theirDID,
+				FromPrior: "",
+			},
+		}
+
+		_, _, err := handler.handleInboundRotateAck("did:oops:wrong", connRec)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "inbound message sent to unexpected DID")
+	})
+
+	t.Run("fail: error saving connection record", func(t *testing.T) {
+		recip := createBlankDIDRotator(t)
+
+		connID := uuid.New().String()
+
+		connRec := &connection.Record{
+			ConnectionID: connID,
+			State:        connection.StateNameCompleted,
+			TheirDID:     myDID,
+			MyDID:        theirDID,
+			Namespace:    connection.MyNSPrefix,
+			MyDIDRotation: &connection.DIDRotationRecord{
+				OldDID:    "did:test:recipient-old",
+				NewDID:    theirDID,
+				FromPrior: "",
+			},
+		}
+
+		var err error
+
+		mockStore := mockstorage.MockStore{
+			Store: map[string]mockstorage.DBEntry{},
+		}
+
+		recip.connStore, err = connection.NewRecorder(&mockProvider{
+			storeProvider: mockstorage.NewCustomMockStoreProvider(&mockStore),
+		})
+		require.NoError(t, err)
+
+		err = recip.connStore.SaveConnectionRecord(connRec)
+		require.NoError(t, err)
+
+		mockStore.ErrPut = fmt.Errorf("store put error")
+
+		err = recip.HandleInboundMessage(blankMessage, myDID, theirDID)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "updating connection")
 	})
 
 	t.Run("success: pas-through, no rotation on either end", func(t *testing.T) {

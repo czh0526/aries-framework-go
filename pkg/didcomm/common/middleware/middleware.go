@@ -255,7 +255,7 @@ func (h *DIDCommMessageMiddleware) handleInboundRotate(
 	if !alreadyRotated {
 		err = h.verifyJWSAndPayload(jws, payload)
 		if err != nil {
-			return nil, false, fmt.Errorf("'from_prior' verification failed: %w", err)
+			return nil, false, fmt.Errorf("`from_prior` validation failed: %w", err)
 		}
 
 		rec.TheirDID = payload.Sub
@@ -295,11 +295,13 @@ func (h *DIDCommMessageMiddleware) getUnverifiedJWS(senderDID, fromPrior string)
 		return nil
 	})
 
+	// 分析 JMS
 	jws, err := jose.ParseJWS(fromPrior, skipVerify)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parsing DID rotation JWS: %w", err)
 	}
 
+	// 提取 RotatePayload 对象
 	payload := rotatePayload{}
 	err = json.Unmarshal(jws.Payload, &payload)
 	if err != nil {
@@ -360,6 +362,7 @@ func (h *DIDCommMessageMiddleware) RotateConnectionDID(connectionID, signingKID,
 		record.PeerDIDInitialState = initialState
 	}
 
+	// 把连接信息更新的成新的 MyDID
 	record.MyDID = newDID
 
 	err = h.connStore.SaveConnectionRecord(record)
@@ -367,6 +370,7 @@ func (h *DIDCommMessageMiddleware) RotateConnectionDID(connectionID, signingKID,
 		return fmt.Errorf("saving connection record under my new DID: %w", err)
 	}
 
+	// 把旧的连接信息保存成一个新的 ConnectionID
 	record.MyDID = oldDID
 	record.ConnectionID = uuid.New().String()
 

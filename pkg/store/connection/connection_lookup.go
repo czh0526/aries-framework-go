@@ -2,6 +2,7 @@ package connection
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/log"
 	did_endpoint "github.com/czh0526/aries-framework-go/component/models/did/endpoint"
@@ -75,9 +76,22 @@ func (c *Lookup) GetConnectionIDByDIDs(myDID, theirDID string) (string, error) {
 	return record.ConnectionID, nil
 }
 
-func (c *Lookup) GetConnectionRecord(s string) (*Record, error) {
-	//TODO implement me
-	panic("implement me")
+func (c *Lookup) GetConnectionRecord(connectionID string) (*Record, error) {
+	var rec Record
+
+	err := getAndUnmarshal(getConnectionKeyPrefix()(connectionID), &rec, c.store)
+	if err != nil {
+		if errors.Is(err, spistorage.ErrDataNotFound) {
+			err = getAndUnmarshal(getConnectionKeyPrefix()(connectionID), &rec, c.protocolStateStore)
+			if err != nil {
+				return nil, err
+			} else {
+				return nil, err
+			}
+		}
+	}
+
+	return &rec, nil
 }
 
 func (c *Lookup) GetConnectionRecordByDIDs(myDID, theirDID string) (*Record, error) {

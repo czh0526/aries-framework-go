@@ -146,7 +146,7 @@ func (s *MockStore) Query(expression string, options ...spistorage.QueryOption) 
 		return nil, errInvalidQueryExpressionFormat
 	}
 
-	expressionSplit := strings.Split(expression, ".")
+	expressionSplit := strings.Split(expression, ":")
 	switch len(expressionSplit) {
 	case expressionTagNameOnlyLength:
 		expressionTagName := expressionSplit[0]

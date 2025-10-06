@@ -19,7 +19,8 @@ type Recorder struct {
 
 func (r Recorder) SaveConnectionRecord(record *Record) error {
 	err := marshalAndSave(getConnectionKeyPrefix()(record.ConnectionID), record,
-		r.protocolStateStore, spistorage.Tag{
+		r.protocolStateStore,
+		spistorage.Tag{
 			Name:  getConnectionKeyPrefix()(""),
 			Value: getConnectionKeyPrefix()(record.ConnectionID),
 		})
@@ -29,7 +30,8 @@ func (r Recorder) SaveConnectionRecord(record *Record) error {
 
 	if record.State != "" {
 		err = marshalAndSave(getConnectionStateKeyPrefix()(record.ConnectionID, record.State), record,
-			r.protocolStateStore, spistorage.Tag{
+			r.protocolStateStore,
+			spistorage.Tag{
 				Name:  connStateKeyPrefix,
 				Value: getConnectionStateKeyPrefix()(record.ConnectionID),
 			})
@@ -39,7 +41,8 @@ func (r Recorder) SaveConnectionRecord(record *Record) error {
 	}
 
 	if record.State == StateNameCompleted {
-		err = marshalAndSave(getConnectionKeyPrefix()(record.ConnectionID), record, r.store,
+		err = marshalAndSave(getConnectionKeyPrefix()(record.ConnectionID), record,
+			r.store,
 			spistorage.Tag{
 				Name:  getConnectionKeyPrefix()(""),
 				Value: getConnectionKeyPrefix()(record.ConnectionID),

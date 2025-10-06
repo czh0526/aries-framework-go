@@ -2,7 +2,9 @@ package provider
 
 import (
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
+	"github.com/czh0526/aries-framework-go/pkg/framework/aries/api"
 	"github.com/czh0526/aries-framework-go/pkg/store/did"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -22,8 +24,8 @@ type Provider struct {
 	PackerValue                       packer.Packer
 	CryptoValue                       spicrypto.Crypto
 	VDRegistryValue                   vdrapi.Registry
-	//OutboundDispatcherValue           dispatcher.Outbound
-
+	MessageServiceProviderValue       api.MessageServiceProvider
+	InboundMessengerValue             service.InboundMessenger
 }
 
 func (p *Provider) KMS() spikms.KeyManager {
