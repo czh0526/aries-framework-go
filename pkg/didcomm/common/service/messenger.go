@@ -37,7 +37,7 @@ func (c *context) All() map[string]interface{} {
 	return c.props
 }
 
-func NewDICommContext(myDID, theirDID string, props map[string]interface{}) DIDCommContext {
+func NewDIDCommContext(myDID, theirDID string, props map[string]interface{}) DIDCommContext {
 	return &context{
 		myDID:    myDID,
 		theirDID: theirDID,

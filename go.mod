@@ -14,10 +14,13 @@ require (
 
 require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20250704110927-1a7734733494
 	github.com/go-jose/go-jose v2.6.3+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.4
+	github.com/golang/mock v1.6.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/piprate/json-gold v0.5.0
 	github.com/rs/cors v1.11.1
 	github.com/tink-crypto/tink-go/v2 v2.4.0

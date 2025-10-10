@@ -1,8 +1,16 @@
 package service
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/models/did"
+	"reflect"
+	"strings"
+	"time"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -14,22 +22,115 @@ const (
 	jsonThreadID       = "thid"
 	jsonParentThreadID = "pthid"
 	jsonMetadata       = "_internal_metadata"
-)
 
-type Version string
+	basePIURI = "https://didcomm.org/"
+	oldPIURI  = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/"
+)
 
 const (
 	V1 Version = "v1"
 	V2 Version = "v2"
 )
 
-type options struct {
-	V Version
+type DIDCommMsgMap map[string]interface{}
+
+func (m DIDCommMsgMap) SetID(id string, opts ...Opt) {
+	if m == nil {
+		return
+	}
+
+	o := getOptions(opts...)
+
+	if o.V == V2 {
+		m[jsonIDV2] = id
+
+		return
+	}
+
+	m[jsonIDV1] = id
 }
 
-type Opt func(o *options)
+func (m DIDCommMsgMap) SetThread(thid, pthid string, opts ...Opt) {
+	if m == nil {
+		return
+	}
 
-type DIDCommMsgMap map[string]interface{}
+	if thid == "" && pthid == "" {
+		return
+	}
+
+	o := getOptions(opts...)
+
+	if o.V == V2 {
+		if thid != "" {
+			m[jsonThreadID] = thid
+		}
+
+		if pthid != "" {
+			m[jsonParentThreadID] = pthid
+		}
+
+		return
+	}
+
+	thread := map[string]interface{}{}
+
+	if thid != "" {
+		thread[jsonThreadID] = thid
+	}
+
+	if pthid != "" {
+		thread[jsonParentThreadID] = pthid
+	}
+
+	m[jsonThread] = thread
+}
+
+func (m DIDCommMsgMap) UnsetThread() {
+	if m == nil {
+		return
+	}
+
+	delete(m, jsonThread)
+	delete(m, jsonThreadID)
+	delete(m, jsonParentThreadID)
+}
+
+func (m DIDCommMsgMap) ParentThreadID() string {
+	if m == nil {
+		return ""
+	}
+
+	parentThreadID, ok := m[jsonParentThreadID].(string)
+	if ok && parentThreadID != "" {
+		return parentThreadID
+	}
+
+	if m[jsonThread] != nil {
+		return ""
+	}
+
+	if thread, ok := m[jsonThread].(map[string]interface{}); ok && thread != nil {
+		if pthID, ok := thread[jsonParentThreadID].(string); ok && pthID != "" {
+			return pthID
+		}
+	}
+
+	return ""
+}
+
+func (m DIDCommMsgMap) Metadata() map[string]interface{} {
+	if m[jsonMetadata] == nil {
+		return nil
+	}
+
+	metadata, ok := m[jsonMetadata].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	return metadata
+}
 
 func (m DIDCommMsgMap) idV1() string {
 	if m == nil || m[jsonIDV1] == nil {
@@ -135,6 +236,89 @@ func (m DIDCommMsgMap) Clone() DIDCommMsgMap {
 	return msg
 }
 
+func (m DIDCommMsgMap) typeV1() string {
+	if m == nil || m[jsonTypeV1] == nil {
+		return ""
+	}
+
+	res, ok := m[jsonTypeV1].(string)
+	if !ok {
+		return ""
+	}
+
+	return res
+}
+
+func (m DIDCommMsgMap) typeV2() string {
+	if m == nil || m[jsonTypeV2] == nil {
+		return ""
+	}
+
+	res, ok := m[jsonTypeV2].(string)
+	if !ok {
+		return ""
+	}
+
+	return res
+}
+
+func (m DIDCommMsgMap) Type() string {
+	if val := m.typeV1(); val != "" {
+		return val
+	}
+
+	return m.typeV2()
+}
+
+type MsgMapDecoder interface {
+	FromDIDCommMsgMap(msgMap DIDCommMsgMap) error
+}
+
+func (m DIDCommMsgMap) Decode(v interface{}) error {
+	if dec, ok := v.(MsgMapDecoder); ok {
+		return dec.FromDIDCommMsgMap(m)
+	}
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook:       decodeHook,
+		WeaklyTypedInput: true,
+		Result:           v,
+		TagName:          "json",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return decoder.Decode(m)
+}
+
+func decodeHook(rt1, rt2 reflect.Type, v interface{}) (interface{}, error) {
+	if rt1.Kind() == reflect.String {
+		if rt2 == reflect.TypeOf(time.Time{}) {
+			return time.Parse(time.RFC3339, v.(string))
+		}
+		if rt2.Kind() == reflect.Slice && rt2.Elem().Kind() == reflect.Uint8 {
+			return base64.StdEncoding.DecodeString(v.(string))
+		}
+	}
+
+	if rt1.Kind() == reflect.Map && rt2.Kind() == reflect.Slice && rt2.Elem().Kind() == reflect.Uint8 {
+		return json.Marshal(v)
+	}
+
+	if rt2 == reflect.TypeOf(did.Doc{}) {
+		didDoc, err := json.Marshal(v)
+		if err != nil {
+			return nil, fmt.Errorf("error remarshaling to json: %w", err)
+		}
+
+		return did.ParseDocument(didDoc)
+	}
+
+	return v, nil
+}
+
 func IsDIDCommV2(msg *DIDCommMsgMap) (bool, error) {
 	_, hasIDV2 := (*msg)["id"]
 	_, hasTypeV2 := (*msg)["type"]
@@ -151,4 +335,44 @@ func IsDIDCommV2(msg *DIDCommMsgMap) (bool, error) {
 	}
 
 	return false, fmt.Errorf("not a valid didcomm v1 or v2 message")
+}
+
+func ParseDIDCommMsgMap(payload []byte) (DIDCommMsgMap, error) {
+	var msg DIDCommMsgMap
+
+	err := json.Unmarshal(payload, &msg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload data format: %w", err)
+	}
+
+	_, ok := msg[jsonTypeV1]
+	if typ := msg.Type(); typ != "" && ok {
+		msg[jsonTypeV1] = strings.Replace(typ, oldPIURI, basePIURI, 1)
+	}
+
+	return msg, nil
+}
+
+var _ DIDCommMsg = (*DIDCommMsgMap)(nil)
+
+type Version string
+
+type options struct {
+	V Version
+}
+
+type Opt func(o *options)
+
+func getOptions(opts ...Opt) *options {
+	o := &options{}
+
+	for i := range opts {
+		opts[i](o)
+	}
+
+	if o.V == "" {
+		o.V = V1
+	}
+
+	return o
 }

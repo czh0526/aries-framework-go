@@ -57,3 +57,39 @@ func UnsignedGenesisDelta(doc *didmodel.Doc) (string, error) {
 
 	return peerDeltaB64, nil
 }
+
+func DocFromGenesisDelta(initialState string) (*didmodel.Doc, error) {
+	var deltas []docDelta
+
+	genesis, err := base64.RawURLEncoding.DecodeString(initialState)
+	if err != nil {
+		return nil, fmt.Errorf("decoding initialState: %w", err)
+	}
+
+	err = json.Unmarshal(genesis, &deltas)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling deltas: %w", err)
+	}
+
+	if len(deltas) != 1 {
+		return nil, fmt.Errorf("unsupported: only delta arrays with a single delta are supported")
+	}
+
+	return assembleDocFromDeltas(deltas)
+}
+
+func assembleDocFromDeltas(deltas []docDelta) (*didmodel.Doc, error) {
+	delta := deltas[0]
+
+	doc, err := base64.URLEncoding.DecodeString(delta.Change)
+	if err != nil {
+		return nil, fmt.Errorf("decoding of document delta failed: %w", err)
+	}
+
+	document, err := didmodel.ParseDocument(doc)
+	if err != nil {
+		return nil, fmt.Errorf("document ParseDocument() failed: %w", err)
+	}
+
+	return document, nil
+}

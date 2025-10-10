@@ -8,6 +8,11 @@ gen-proto:
 	protoc --proto_path=./proto/tink -I /Users/zhihongcai/Workspaces/github.com/tink-crypto/tink --go_out=./component/kmscrypto/crypto/tinkcrypto/primitive/proto/aes_cbc_hmac_aead_go_proto --go_opt=paths=source_relative proto/tink/aes_cbc_hmac_aead.proto
 	protoc --proto_path=./proto/tink -I /Users/zhihongcai/Workspaces/github.com/tink-crypto/tink --go_out=./component/kmscrypto/crypto/tinkcrypto/primitive/proto/secp256k1_go_proto --go_opt=paths=source_relative proto/tink/secp256k1.proto
 
+
+gen-mock:
+	mockgen -destination pkg/internal/gomocks/spi/storage/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/spi/storage Provider,Store
+	mockgen -destination pkg/internal/gomocks/didcomm/common/service/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/pkg/didcomm/common/service Messenger,MessengerHandler
+
 .PHONE: build
 build:
 	cd ./pkg/framework/aries

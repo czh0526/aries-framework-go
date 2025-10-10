@@ -21,6 +21,7 @@ import (
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
+	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
 	"github.com/google/uuid"
 	"time"
 )
@@ -153,6 +154,52 @@ func (h *DIDCommMessageMiddleware) HandleInboundMessage(
 		}
 	}
 
+	return nil
+}
+
+func (h *DIDCommMessageMiddleware) HandleInboundPeerDID(msg didcommservice.DIDCommMsgMap) error {
+	from, ok := msg[fromDIDJSONKey].(string)
+	if !ok {
+		return nil
+	}
+
+	didURL, err := did.ParseDIDURL(from)
+	if err != nil {
+		if isV2, e := didcommservice.IsDIDCommV2(&msg); isV2 || e != nil {
+			return nil
+		}
+		return fmt.Errorf("parsing their DID: %w", err)
+	}
+
+	if didURL.Method != peer.DIDMethod {
+		return nil
+	}
+
+	initialState, ok := didURL.Queries[initialStateParam]
+	if !ok {
+		return nil
+	}
+
+	if len(initialState) == 0 {
+		return fmt.Errorf("expected initialState to have value")
+	}
+
+	theirDoc, err := peer.DocFromGenesisDelta(initialState[0])
+	if err != nil {
+		return fmt.Errorf("parsing DID doc from peer DID initialState: %w", err)
+	}
+
+	_, err = h.vdr.Create(peer.DIDMethod, theirDoc, spivdr.WithOption("store", true))
+	if err != nil {
+		return fmt.Errorf("saving their peer DID: %w", err)
+	}
+
+	err = h.didStore.SaveDIDFromDoc(theirDoc)
+	if err != nil {
+		return fmt.Errorf("saving key to did map for their peer DID: %w", err)
+	}
+
+	msg[fromDIDJSONKey] = didURL.DID.String()
 	return nil
 }
 

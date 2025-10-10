@@ -2,8 +2,13 @@ package inbound
 
 import (
 	"github.com/czh0526/aries-framework-go/component/models/did"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
+	mocks "github.com/czh0526/aries-framework-go/pkg/internal/gomocks/didcomm/common/service"
 	"github.com/czh0526/aries-framework-go/pkg/mock/didcomm/msghandler"
+	mockdidexchange "github.com/czh0526/aries-framework-go/pkg/mock/didcomm/protocol/didexchange"
 	mockprovider "github.com/czh0526/aries-framework-go/pkg/mock/provider"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -13,11 +18,33 @@ func TestNewInboundMessageHandler(t *testing.T) {
 	})
 }
 
+func TestMessageHandler_HandlerFunc(t *testing.T) {
+	handler := NewInboundMessageHandler(emptyProvider())
+
+	handleFunc := handler.HandlerFunc()
+
+	err := handleFunc(&transport.Envelope{
+		Message: []byte(`{
+	"@id": "12345",
+	"@type": "message-type",
+}`),
+	})
+	require.NoError(t, err)
+}
+
 func emptyProvider() *mockprovider.Provider {
 	return &mockprovider.Provider{
 		DIDConnectionStoreValue:     &mockDIDStore{},
 		MessageServiceProviderValue: &msghandler.MockMsgSvcProvider{},
 		InboundMessengerValue:       &mocks.MockMessengerHandler{},
+		ServiceValue: &mockdidexchange.MockDIDExchangeSvc{
+			AcceptFunc: func(_ string) bool {
+				return true
+			},
+			HandleFunc: func(msg service.DIDCommMsg) (string, error) {
+				return "", nil
+			},
+		},
 	}
 }
 

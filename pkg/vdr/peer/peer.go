@@ -13,3 +13,7 @@ const (
 func UnsignedGenesisDelta(doc *did.Doc) (string, error) {
 	return peer.UnsignedGenesisDelta(doc)
 }
+
+func DocFromGenesisDelta(initialState string) (*did.Doc, error) {
+	return peer.DocFromGenesisDelta(initialState)
+}
