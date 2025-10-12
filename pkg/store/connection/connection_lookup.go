@@ -102,6 +102,21 @@ func (c *Lookup) GetConnectionRecordByTheirDID(theirDID string) (*Record, error)
 	return c.queryExpectingOne(theirDIDTagName+":"+tagValueFromDIDs(theirDID), c.store)
 }
 
+func (c *Lookup) GetConnectionRecordByNSThreadID(nsThreadID string) (*Record, error) {
+	connectionIDBytes, err := c.protocolStateStore.Get(nsThreadID)
+	if err != nil {
+		return nil, fmt.Errorf("get connectionID by namespaced threadID: %w", err)
+	}
+
+	var rec Record
+	err = getAndUnmarshal(getConnectionKeyPrefix()(string(connectionIDBytes)), &rec, c.protocolStateStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection record by NS threadID: %s, err = %w", nsThreadID, err)
+	}
+
+	return &rec, nil
+}
+
 func (c *Lookup) queryExpectingOne(query string, store spistorage.Store) (*Record, error) {
 	records, err := queryRecordsFromStore(query, store, nil, nil)
 	if err != nil {
@@ -163,6 +178,15 @@ func NewLookup(p provider) (*Lookup, error) {
 	}, nil
 }
 
+func CreateNamespaceKey(prefix, thID string) (string, error) {
+	key, err := computeHash([]byte(thID))
+	if err != nil {
+		return "", err
+	}
+
+	return getNamespaceKeyPrefix(prefix)(key), nil
+}
+
 func getAndUnmarshal(key string, target interface{}, store spistorage.Store) error {
 	bytes, err := store.Get(key)
 	if err != nil {
@@ -186,6 +210,24 @@ func getConnectionKeyPrefix() KeyPrefix {
 func getConnectionStateKeyPrefix() KeyPrefix {
 	return func(keys ...string) string {
 		return fmt.Sprintf(keyPattern, connStateKeyPrefix, strings.Join(keys, keySeparator))
+	}
+}
+
+func getNamespaceKeyPrefix(prefix string) KeyPrefix {
+	return func(keys ...string) string {
+		return fmt.Sprintf(keyPattern, prefix, strings.Join(keys, keySeparator))
+	}
+}
+
+func getEventDataKeyPrefix() KeyPrefix {
+	return func(keys ...string) string {
+		return fmt.Sprintf(keyPattern, eventDataKeyPrefix, strings.Join(keys, keySeparator))
+	}
+}
+
+func getInvitationKeyPrefix() KeyPrefix {
+	return func(keys ...string) string {
+		return fmt.Sprintf(keyPattern, invKeyPrefix, strings.Join(keys, keySeparator))
 	}
 }
 

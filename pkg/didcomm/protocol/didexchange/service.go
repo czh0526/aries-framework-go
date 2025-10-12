@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/log"
+	"github.com/czh0526/aries-framework-go/component/models/did"
+	"github.com/czh0526/aries-framework-go/component/vdr"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
@@ -34,6 +36,12 @@ const (
 )
 
 var logger = log.New("aries-framework/did-exchange/service")
+
+type opts interface {
+	publicDID() string
+	Label() string
+	RouterConnections() []string
+}
 
 type options struct {
 	publicDID         string
@@ -94,6 +102,28 @@ type Service struct {
 	initialized        bool
 }
 
+func (s *Service) RespondTo(i *OOBInvitation, routerConnections []string) (string, error) {
+	i.Type = oobMsgType
+
+	msg := service.NewDIDCommMsgMap(i)
+	msg.Metadata()[routerConnsMetadataKey] = routerConnections
+
+	return s.HandleInbound(msg, service.EmptyDIDCommContext())
+}
+
+func (s *Service) SaveInvitation(i *OOBInvitation) error {
+	i.Type = oobMsgType
+
+	err := s.connectionRecorder.SaveInvitation(i.ThreadID, i)
+	if err != nil {
+		return fmt.Errorf("failed to save invitation: %w", err)
+	}
+
+	logger.Debugf("save invitation %+v", i)
+
+	return nil
+}
+
 func (s *Service) HandleInbound(msg service.DIDCommMsg, ctx service.DIDCommContext) (string, error) {
 	logger.Debugf("receive inbound message: %s", msg)
 
@@ -115,7 +145,7 @@ func (s *Service) HandleInbound(msg service.DIDCommMsg, ctx service.DIDCommConte
 	logger.Debugf("connection record: %s", msg)
 
 	internalMsg := &message{
-		Options:       &options{routerCibbections: retrievingRouterConnections(msg)},
+		Options:       &options{routerConnections: retrievingRouterConnections(msg)},
 		Msg:           msg.Clone(),
 		ThreadID:      thID,
 		NextStateName: next.Name(),
@@ -250,7 +280,7 @@ func (s *Service) handle(msg *message, aEvent chan<- service.DIDCommAction) erro
 			StateID:      next.Name(),
 			Properties:   createEventProperties(msg.ConnRecord.ConnectionID, msg.ConnRecord.InvitationID),
 		})
-		logger.Debugf("send pre state event %s", next.Name())
+		logger.Debugf("send pre event for state %s", next.Name())
 
 		var (
 			action           stateAction
@@ -285,22 +315,216 @@ func (s *Service) handle(msg *message, aEvent chan<- service.DIDCommAction) erro
 		}
 
 		if err = action(); err != nil {
-			return fmt.E
+			return fmt.Errorf("failed to execute state action '%s': %w", next.Name(), err)
+		}
+
+		logger.Debugf("processed execute state action: '%s'", next.Name())
+
+		prev := next
+		next = followup
+		haltExecution := false
+
+		if msg.Msg.Type() != oobMsgType &&
+			canTriggerActionEvents(connectionRecord.State, connectionRecord.Namespace) {
+			logger.Debugf("action event triggered msg type: %s", msg.Msg.Type())
+
+			msg.NextStateName = next.Name()
+			if err = s.sendActionEvent(msg, aEvent); err != nil {
+				return fmt.Errorf("handle inbound: %w", err)
+			}
+
+			haltExecution = true
+		}
+
+		s.sendMsgEvents(&service.StateMsg{
+			ProtocolName: DIDExchange,
+			Type:         service.PostState,
+			Msg:          msg.Msg.Clone(),
+			StateID:      prev.Name(),
+			Properties:   createEventProperties(connectionRecord.ConnectionID, connectionRecord.InvitationID),
+		})
+		logger.Debugf("send post event for state %s", next.Name())
+
+		if haltExecution {
+			logger.Debugf("halted execution before state=%s", msg.NextStateName)
+			break
 		}
 	}
 
 	return nil
 }
 
+func (s *Service) handleWithoutAction(msg *message) error {
+	return s.handle(msg, nil)
+}
+
 func (s *Service) sendMsgEvents(msg *service.StateMsg) {
 	for _, handler := range s.MsgEvents() {
 		handler <- *msg
+
+		logger.Debugf("sent msg event to handler: %+v", msg)
+	}
+}
+
+func (s *Service) sendActionEvent(internalMsg *message, aEvent chan<- service.DIDCommAction) error {
+	err := s.storeEventProtocolStateData(internalMsg)
+	if err != nil {
+		return fmt.Errorf("send action event: %w", err)
+	}
+
+	if aEvent != nil {
+		aEvent <- service.DIDCommAction{
+			ProtocolName: DIDExchange,
+			Message:      internalMsg.Msg.Clone(),
+			Continue: func(args interface{}) {
+				switch v := args.(type) {
+				case opts:
+					internalMsg.Options = &options{
+						publicDID:         v.publicDID(),
+						label:             v.Label(),
+						routerConnections: v.RouterConnections(),
+					}
+				default:
+				}
+
+				s.processCallback(internalMsg)
+			},
+			Stop: func(err error) {
+				internalMsg.err = err
+				s.processCallback(internalMsg)
+			},
+			Properties: createEventProperties(
+				internalMsg.ConnRecord.ConnectionID,
+				internalMsg.ConnRecord.InvitationID),
+		}
+
+		logger.Debugf("dispatched action for msg: %+v", internalMsg.Msg)
+	}
+
+	return nil
+}
+
+func (s *Service) update(msgType string, record *connection.Record) error {
+	if (msgType == RequestMsgType && record.State == StateIDRequested) ||
+		(msgType == InvitationMsgType && record.State == StateIDInvited) ||
+		(msgType == oobMsgType && record.State == StateIDInvited) {
+		return s.connectionRecorder.SaveConnectionRecordWithMappings(record)
+	}
+
+	return s.connectionRecorder.SaveConnectionRecord(record)
+}
+
+func (s *Service) processCallback(msg *message) {
+	s.callbackChannel <- msg
+}
+
+func (s *Service) nextState(msgType, thID string) (state, error) {
+	logger.Debugf("msgType = %s, thID = %s", msgType, thID)
+
+	nsThID, err := connection.CreateNamespaceKey(findNamespace(msgType), thID)
+	if err != nil {
+		return nil, err
+	}
+
+	current, err := s.currentState(nsThID)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debugf("rtrieved current stat [%s] using nsThID [%s]", current.Name(), nsThID)
+
+	next, err := stateFromMsgType(msgType)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debugf("check if current state [%s] can transition to [%s]", current.Name(), next.Name())
+
+	if !current.CanTransitionTo(next) {
+		return nil, fmt.Errorf("invalid state transition: %s -> %s", current.Name(), next.Name())
+	}
+
+	return next, nil
+}
+
+func (s *Service) currentState(nsThID string) (state, error) {
+	connRec, err := s.connectionRecorder.GetConnectionRecordByNSThreadID(nsThID)
+	if err != nil {
+		if errors.Is(err, spistorage.ErrDataNotFound) {
+			return &null{}, nil
+		}
+
+		return nil, fmt.Errorf("cannot fetch state from store: thID = %s, err = %w", nsThID, err)
+	}
+
+	return stateFromName(connRec.State)
+}
+
+func (s *Service) connectionRecord(msg service.DIDCommMsg) (*connection.Record, error) {
+	switch msg.Type() {
+	case oobMsgType:
+		return s.oobInvitationMsgRecord(msg)
+	case InvitationMsgType:
+		return s.invitationMsgRecord(msg)
+	case RequestMsgType:
+		return s.requestMsgRecord(msg)
+	case ResponseMsgType:
+		return s.responseMsgRecord(msg)
+	case AckMsgType, CompleteMsgType:
+		return s.fetchConnectionRecord(theirNSPrefix, msg)
+	}
+
+	return nil, errors.New("invalid msg type")
+}
+
+func createEventProperties(connectionID, invitationID string) *didExchangeEvent {
+	return &didExchangeEvent{
+		connectionID: connectionID,
+		invitationID: invitationID,
+	}
+}
+
+func (s *Service) oobInvitationMsgRecord(msg service.DIDCommMsg) (*connection.Record, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *Service) invitationMsgRecord(msg service.DIDCommMsg) (*connection.Record, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *Service) requestMsgRecord(msg service.DIDCommMsg) (*connection.Record, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *Service) responseMsgRecord(msg service.DIDCommMsg) (*connection.Record, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *Service) fetchConnectionRecord(prefix string, msg service.DIDCommMsg) (*connection.Record, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *Service) CreateConnection(record *connection.Record, theirDID *did.Doc) error {
+	logger.Debugf("creating connection using record [%+v] and theirDID [%+v]", record, theirDID)
+
+	didMethod, err := vdr.GetDidMethod(theirDID.ID)
+	if err != nil {
+		return err
 	}
 }
 
 func isNoOp(s state) bool {
 	_, ok := s.(*noOp)
 	return ok
+}
+
+func findNamespace(msgType string) string {
+	namespace := theirNSPrefix
+	if msgType == InvitationMsgType || msgType == ResponseMsgType || msgType == oobMsgType {
+		namespace = myNSPrefix
+	}
+
+	return namespace
 }
 
 var _ dispatcher.ProtocolService = (*Service)(nil)

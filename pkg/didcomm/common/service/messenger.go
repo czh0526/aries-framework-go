@@ -45,6 +45,12 @@ func NewDIDCommContext(myDID, theirDID string, props map[string]interface{}) DID
 	}
 }
 
+func EmptyDIDCommContext() DIDCommContext {
+	return &context{
+		props: make(map[string]interface{}),
+	}
+}
+
 type Messenger interface {
 	ReplyTo(msgID string, msg DIDCommMsgMap, opts ...Opt) error
 

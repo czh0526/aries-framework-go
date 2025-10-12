@@ -12,3 +12,8 @@ type Handler interface {
 	InboundHandler
 	OutboundHandler
 }
+
+type DIDComm interface {
+	Handler
+	Event
+}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/models/did"
+	"github.com/google/uuid"
 	"reflect"
 	"strings"
 	"time"
@@ -353,7 +354,125 @@ func ParseDIDCommMsgMap(payload []byte) (DIDCommMsgMap, error) {
 	return msg, nil
 }
 
+func NewDIDCommMsgMap(v interface{}) DIDCommMsgMap {
+	msg := toMap(v)
+
+	msg[jsonMetadata] = map[string]interface{}{}
+
+	_, hasIDV1 := msg["@id"]
+	_, hasTypeV1 := msg["@type"]
+	_, hasIDV2 := msg["id"]
+	_, hasTypeV2 := msg["type"]
+
+	if hasIDV1 || hasIDV2 {
+		return msg
+	}
+
+	if hasTypeV2 && !hasIDV2 {
+		msg["id"] = uuid.New().String()
+	} else if hasTypeV1 && !hasIDV1 {
+		msg["@id"] = uuid.New().String()
+	}
+
+	return msg
+}
+
 var _ DIDCommMsg = (*DIDCommMsgMap)(nil)
+
+func toMap(v interface{}) map[string]interface{} {
+	res := make(map[string]interface{})
+
+	// if it is pointer returns the value
+	rv := reflect.Indirect(reflect.ValueOf(v))
+	for rfv, field := range mapValueStructField(rv) {
+		// the default name is equal to field Name
+		name := field.Name
+
+		tags := strings.Split(field.Tag.Get(`json`), ",")
+		// if tag is not empty name is equal to tag
+		if tags[0] != "" {
+			name = tags[0]
+		}
+
+		res[name] = convert(rfv)
+	}
+
+	return res
+}
+
+func mapValueStructField(value reflect.Value) map[reflect.Value]reflect.StructField {
+	fields := make(map[reflect.Value]reflect.StructField)
+	rt := value.Type()
+
+	for i := 0; i < rt.NumField(); i++ {
+		rv, sf := value.Field(i), rt.Field(i)
+
+		tags := strings.Split(sf.Tag.Get(`json`), ",")
+
+		// the field should be ignored according to JSON tag `json:"-"`
+		if tags[0] == "-" {
+			continue
+		}
+
+		// the field should be ignored if it is empty according to JSON tag `json:",omitempty"`
+		// NOTE: works when omitempty it the last one
+		if tags[len(tags)-1] == "omitempty" {
+			if reflect.DeepEqual(reflect.Zero(rv.Type()).Interface(), rv.Interface()) {
+				continue
+			}
+		}
+
+		// unexported fields should be ignored as well
+		if sf.PkgPath != "" {
+			continue
+		}
+
+		// if it is an embedded field, we need to add it to the map
+		// NOTE: for now, the only embedded structure is supported
+		rv = reflect.Indirect(rv)
+		if sf.Anonymous && rv.Kind() == reflect.Struct {
+			// if an embedded field doesn't have a tag it means the same level
+			if tags[0] == "" {
+				for k, v := range mapValueStructField(rv) {
+					fields[k] = v
+				}
+
+				continue
+			}
+		}
+
+		fields[rv] = sf
+	}
+
+	return fields
+}
+
+func convert(val reflect.Value) interface{} {
+	switch reflect.Indirect(val).Kind() {
+	case reflect.Array, reflect.Slice:
+		res := make([]interface{}, val.Len())
+		for i := range res {
+			res[i] = convert(val.Index(i))
+		}
+
+		return res
+	case reflect.Map:
+		res := make(map[string]interface{}, val.Len())
+		for _, k := range val.MapKeys() {
+			res[k.String()] = convert(val.MapIndex(k))
+		}
+
+		return res
+	case reflect.Struct:
+		if res := toMap(val.Interface()); len(res) != 0 {
+			return res
+		}
+
+		return val.Interface()
+	}
+
+	return val.Interface()
+}
 
 type Version string
 
