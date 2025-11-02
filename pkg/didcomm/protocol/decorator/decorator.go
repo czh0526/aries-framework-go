@@ -1,5 +1,7 @@
 package decorator
 
+import "time"
+
 const (
 	TransportReturnRouteNone = "none"
 
@@ -21,4 +23,8 @@ type Transport struct {
 
 type ReturnRoute struct {
 	Value string `json:"~return_route,omitempty"`
+}
+
+type Timing struct {
+	ExpiresTime time.Time `json:"expires_time,omitempty"`
 }

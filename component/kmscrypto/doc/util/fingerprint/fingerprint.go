@@ -168,3 +168,25 @@ func PubKeyFromFingerprint(fingerprint string) ([]byte, uint64, error) {
 
 	return mc[br:], code, nil
 }
+
+func PubKeyFromDIDKey(didKey string) ([]byte, error) {
+	idMethodSpecificID, err := MethodIDFromDIDKey(didKey)
+	if err != nil {
+		return nil, fmt.Errorf("pubKeyFromDIDKey: MethodIDFromDIDKey: %w", err)
+	}
+
+	pubKey, code, err := PubKeyFromFingerprint(idMethodSpecificID)
+	if err != nil {
+		return nil, err
+	}
+
+	switch code {
+	case X25519PubKeyMultiCodec, ED25519PubKeyMultiCodec, BLS12381g2PubKeyMultiCodec, BLS12381g1g2PubKeyMultiCodec,
+		P256PubKeyMultiCodec, P384PubKeyMultiCodec, P521PubKeyMultiCodec:
+		break
+	default:
+		return nil, fmt.Errorf("pubKeyFromDIDKey: unsupported key multicodec code [0x%x]", code)
+	}
+
+	return pubKey, nil
+}

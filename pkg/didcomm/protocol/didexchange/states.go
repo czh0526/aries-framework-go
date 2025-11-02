@@ -3,6 +3,7 @@ package didexchange
 import (
 	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	connectionstore "github.com/czh0526/aries-framework-go/pkg/store/connection"
 )
 
@@ -177,3 +178,15 @@ var _ state = (*completed)(nil)
 var _ state = (*abandoned)(nil)
 var _ state = (*noOp)(nil)
 var _ state = (*null)(nil)
+
+func isDIDCommV2(mediaTypeProfiles []string) bool {
+	for _, mtp := range mediaTypeProfiles {
+		switch mtp {
+		case transport.MediaTypeDIDCommV2Profile,
+			transport.MediaTypeAIP2RFC0587Profile:
+			return true
+		}
+	}
+
+	return false
+}

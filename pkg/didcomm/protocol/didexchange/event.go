@@ -19,3 +19,8 @@ func (ex *didExchangeEvent) All() map[string]interface{} {
 		"invitationID": ex.invitationID,
 	}
 }
+
+type didExchangeEventError struct {
+	didExchangeEvent
+	err error
+}

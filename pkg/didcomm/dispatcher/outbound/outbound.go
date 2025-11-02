@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmsdidkey"
 	"github.com/czh0526/aries-framework-go/component/log"
+	did_endpoint "github.com/czh0526/aries-framework-go/component/models/did/endpoint"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	commonmodel "github.com/czh0526/aries-framework-go/pkg/common/model"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/middleware"
@@ -57,133 +58,12 @@ type Dispatcher struct {
 	didcommV2Handler     *middleware.DIDCommMessageMiddleware
 }
 
-func (o *Dispatcher) SendToDID(msg interface{}, myDID, theirDID string) error {
-	myDocResolution, err := o.vdRegistry.Resolve(myDID)
-	if err != nil {
-		return fmt.Errorf("failed to resolve myDID %q: %w", myDID, err)
-	}
-
-	theirDocResolution, err := o.vdRegistry.Resolve(theirDID)
-	if err != nil {
-		return fmt.Errorf("failed to resolve theirDID %q: %w", theirDID, err)
-	}
-
-	var connectionVersion service.Version
-	didcommMsg, isMsgMap := msg.(service.DIDCommMsgMap)
-
-	var isV2 bool
-
-	if isMsgMap {
-		isV2, err = service.IsDIDCommV2(&didcommMsg)
-		if err == nil && isV2 {
-			connectionVersion = service.V2
-		} else {
-			connectionVersion = service.V1
-		}
-	}
-
-	connRec, err := o.getOrCreateConnection(myDID, theirDID, connectionVersion)
-	if err != nil {
-		return fmt.Errorf("failed to fetch connection record: %w", err)
-	}
-
-	var sendWithAnoncrypt bool
-
-	if isMsgMap {
-		didcommMsg = o.didcommV2Handler.HandleOutboundMessage(didcommMsg, connRec)
-
-		if connRec.PeerDIDInitialState != "" {
-			sendWithAnoncrypt = true
-		}
-
-		if connRec.DIDCommVersion == service.V2 && connRec.ParentThreadID != "" && connectionVersion == service.V2 {
-			pthid, hasPthid := didcommMsg["pthid"].(string)
-			thid, e := didcommMsg.ThreadID()
-		}
-		msg = &didcommMsg
-	} else {
-
-	}
-}
-
-func (o *Dispatcher) Forward(i interface{}, destination *service.Destination) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (o *Dispatcher) getOrCreateConnection(myDID, theirDID string, connectionVersion service.Version) (
-	*connection.Record, error) {
-
-	record, err := o.connections.GetConnectionRecordByDIDs(myDID, theirDID)
-	if err == nil {
-		return record, nil
-	} else if !errors.Is(err, spistorage.ErrDataNotFound) {
-		return nil, fmt.Errorf("failed to check if connection exists: %w", err)
-	}
-
-	logger.Debugf("no connection record found for myDID=%s theirDID=%s, will create", myDID, theirDID)
-
-	newRecord := connection.Record{
-		ConnectionID:   uuid.New().String(),
-		MyDID:          myDID,
-		TheirDID:       theirDID,
-		State:          connection.StateNameCompleted,
-		Namespace:      connection.MyNSPrefix,
-		DIDCommVersion: connectionVersion,
-	}
-
-	if connectionVersion == service.V2 {
-		newRecord.ServiceEndPoint = commonmodel.NewDIDCommV2Endpoint()
-	} else {
-		newRecord.MediaTypeProfiles = o.defaultMediaTypeProfiles()
-	}
-
-	err = o.connections.SaveConnectionRecord(&newRecord)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save connection record: %w", err)
-	}
-
-	return &newRecord, nil
-}
-
-var _ dispatcher.Outbound = (*Dispatcher)(nil)
-
-type legacyForward struct {
-	Type string          `json:"@type,omitempty"`
-	ID   string          `json:"@id,omitempty"`
-	To   string          `json:"to,omitempty"`
-	Msg  *model.Envelope `json:"msg,omitempty"`
-}
-
-var logger = log.New("aries-framework/didcomm/dispatcher")
-
-func NewOutbound(prov provider) (*Dispatcher, error) {
-	o := &Dispatcher{
-		outboundTransports:   prov.OutboundTransports(),
-		packager:             prov.Packager(),
-		transportReturnRoute: prov.TransportReturnRoute(),
-		vdRegistry:           prov.VDRegistry(),
-		kms:                  prov.KMS(),
-		keyAgreementType:     prov.KeyAgreementType(),
-		mediaTypeProfiles:    prov.MediaTypeProfiles(),
-		didcommV2Handler:     prov.DIDRotator(),
-	}
-
-	var err error
-	o.connections, err = connection.NewRecorder(prov)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init connection recorder: %w", err)
-	}
-
-	return o, nil
-}
-
 func (o *Dispatcher) Send(msg interface{}, senderKey string, dest *service.Destination) error {
 	keys := dest.RecipientKeys
 	if routingKeys, err := dest.ServiceEndpoint.RoutingKeys(); err == nil && len(routingKeys) > 0 {
 		keys = routingKeys
 	} else if len(dest.RoutingKeys) > 0 {
-		keys = routingKeys
+		keys = dest.RoutingKeys
 	}
 
 	var outboundTransport transport.OutboundTransport
@@ -246,6 +126,202 @@ func (o *Dispatcher) Send(msg interface{}, senderKey string, dest *service.Desti
 	return nil
 }
 
+func (o *Dispatcher) SendToDID(msg interface{}, myDID, theirDID string) error {
+	myDocResolution, err := o.vdRegistry.Resolve(myDID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve myDID %q: %w", myDID, err)
+	}
+
+	theirDocResolution, err := o.vdRegistry.Resolve(theirDID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve theirDID %q: %w", theirDID, err)
+	}
+
+	var connectionVersion service.Version
+	didcommMsg, isMsgMap := msg.(service.DIDCommMsgMap)
+
+	var isV2 bool
+
+	if isMsgMap {
+		isV2, err = service.IsDIDCommV2(&didcommMsg)
+		if err == nil && isV2 {
+			connectionVersion = service.V2
+		} else {
+			connectionVersion = service.V1
+		}
+	}
+
+	connRec, err := o.getOrCreateConnection(myDID, theirDID, connectionVersion)
+	if err != nil {
+		return fmt.Errorf("failed to fetch connection record: %w", err)
+	}
+
+	var sendWithAnoncrypt bool
+
+	if isMsgMap {
+		didcommMsg = o.didcommV2Handler.HandleOutboundMessage(didcommMsg, connRec)
+
+		if connRec.PeerDIDInitialState != "" {
+			sendWithAnoncrypt = true
+		}
+
+		if connRec.DIDCommVersion == service.V2 && connRec.ParentThreadID != "" && connectionVersion == service.V2 {
+			pthid, hasPthid := didcommMsg["pthid"].(string)
+			thid, e := didcommMsg.ThreadID()
+
+			if e == nil && didcommMsg.ID() == thid && (!hasPthid || pthid == "") {
+				didcommMsg["pthid"] = connRec.ParentThreadID
+			}
+		}
+		msg = &didcommMsg
+	} else {
+		didcommMsgPtr, ok := msg.(*service.DIDCommMsgMap)
+		if ok {
+			didcommMsg = *didcommMsgPtr
+		} else {
+			didcommMsg = service.NewDIDCommMsgMap(msg)
+			msg = &didcommMsg
+		}
+	}
+
+	dest, err := service.CreateDestination(theirDocResolution.DIDDocument)
+	if err != nil {
+		return fmt.Errorf(
+			"oubbpundDispatcher.SendToDID failed to get didcomm destination for theirDID [%s]: %w", theirDID, err)
+	}
+
+	if len(connRec.MediaTypeProfiles) > 0 {
+		dest.MediaTypeProfiles = make([]string, len(connRec.MediaTypeProfiles))
+		copy(dest.MediaTypeProfiles, connRec.MediaTypeProfiles)
+	}
+
+	mtp := o.mediaTypeProfile(dest)
+	switch mtp {
+	case transport.MediaTypeV1PlaintextPayload, transport.MediaTypeV1EncryptedEnvelope,
+		transport.MediaTypeRFC0019EncryptedEnvelope, transport.MediaTypeAIP2RFC0019Profile:
+		sendWithAnoncrypt = false
+	}
+
+	if sendWithAnoncrypt {
+		return o.Send(msg, "", dest)
+	}
+
+	src, err := service.CreateDestination(myDocResolution.DIDDocument)
+	if err != nil {
+		return fmt.Errorf("outboundDispatcher.SendToDID failed to get didcomm destination for myDID [%s]: %w",
+			myDID, err)
+	}
+
+	key := src.RecipientKeys[0]
+	return o.Send(msg, key, dest)
+}
+
+func (o *Dispatcher) Forward(msg interface{}, dest *service.Destination) error {
+	var (
+		uri string
+		err error
+	)
+
+	uri, err = dest.ServiceEndpoint.URI()
+	if err != nil {
+		logger.Debugf("destination serviceEndpoint forward URI is not set: %w, will skip value", err)
+	}
+
+	for _, v := range o.outboundTransports {
+		if v.AcceptRecipient(dest.RecipientKeys) {
+			if !v.Accept(uri) {
+				continue
+			}
+		}
+
+		req, err := json.Marshal(msg)
+		if err != nil {
+			return fmt.Errorf("outboundDispatcher.Forward: failed to marshal msg: %w", err)
+		}
+
+		_, err = v.Send(req, dest)
+		if err != nil {
+			return fmt.Errorf("outboundDispatcher.Forward: failed to send msg using outbound transport: %w", err)
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("outboundDispatcher.Forward: no transport found for serviceEndpoint: %s", uri)
+}
+
+func (o *Dispatcher) getOrCreateConnection(myDID, theirDID string, connectionVersion service.Version) (
+	*connection.Record, error) {
+
+	record, err := o.connections.GetConnectionRecordByDIDs(myDID, theirDID)
+	if err == nil {
+		return record, nil
+	} else if !errors.Is(err, spistorage.ErrDataNotFound) {
+		return nil, fmt.Errorf("failed to check if connection exists: %w", err)
+	}
+
+	logger.Debugf("no connection record found for myDID=%s theirDID=%s, will create", myDID, theirDID)
+
+	newRecord := connection.Record{
+		ConnectionID:   uuid.New().String(),
+		MyDID:          myDID,
+		TheirDID:       theirDID,
+		State:          connection.StateNameCompleted,
+		Namespace:      connection.MyNSPrefix,
+		DIDCommVersion: connectionVersion,
+	}
+
+	if connectionVersion == service.V2 {
+		newRecord.ServiceEndPoint = commonmodel.NewDIDCommV2Endpoint(
+			[]did_endpoint.DIDCommV2Endpoint{
+				{
+					Accept: o.defaultMediaTypeProfiles(),
+				},
+			})
+	} else {
+		newRecord.MediaTypeProfiles = o.defaultMediaTypeProfiles()
+	}
+
+	err = o.connections.SaveConnectionRecord(&newRecord)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save connection record: %w", err)
+	}
+
+	return &newRecord, nil
+}
+
+var _ dispatcher.Outbound = (*Dispatcher)(nil)
+
+type legacyForward struct {
+	Type string          `json:"@type,omitempty"`
+	ID   string          `json:"@id,omitempty"`
+	To   string          `json:"to,omitempty"`
+	Msg  *model.Envelope `json:"msg,omitempty"`
+}
+
+var logger = log.New("aries-framework/didcomm/dispatcher")
+
+func NewOutbound(prov provider) (*Dispatcher, error) {
+	o := &Dispatcher{
+		outboundTransports:   prov.OutboundTransports(),
+		packager:             prov.Packager(),
+		transportReturnRoute: prov.TransportReturnRoute(),
+		vdRegistry:           prov.VDRegistry(),
+		kms:                  prov.KMS(),
+		keyAgreementType:     prov.KeyAgreementType(),
+		mediaTypeProfiles:    prov.MediaTypeProfiles(),
+		didcommV2Handler:     prov.DIDRotator(),
+	}
+
+	var err error
+	o.connections, err = connection.NewRecorder(prov)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init connection recorder: %w", err)
+	}
+
+	return o, nil
+}
+
 func (o *Dispatcher) addTransportRouteOptions(req []byte, dest *service.Destination) ([]byte, error) {
 	if routingKeys, err := dest.ServiceEndpoint.RoutingKeys(); err == nil && len(routingKeys) > 0 {
 		return req, nil
@@ -290,12 +366,13 @@ func (o *Dispatcher) createForwardMessage(msg []byte, dest *service.Destination)
 		forwardMsgType = service.ForwardMsgType
 	}
 
+	// 检查服务是否需要中转路由
 	routingKeys, err := dest.ServiceEndpoint.RoutingKeys()
 	if err != nil {
-		logger.Debugf("dest.ServiceEndpoint.RoutingKeys() (didcomm v2) returned an error %w, "+
-			"will check routinKeys (didcomm v1) array", err)
+		logger.Debugf(
+			"dest.ServiceEndpoint.RoutingKeys() (didcomm v2) returned an error %w, will check routinKeys (didcomm v1) array", err)
 	}
-
+	// 检查目标地址是否需要中转路由
 	if len(routingKeys) == 0 {
 		if len(dest.RoutingKeys) == 0 {
 			return msg, nil
@@ -304,6 +381,7 @@ func (o *Dispatcher) createForwardMessage(msg []byte, dest *service.Destination)
 		routingKeys = dest.RoutingKeys
 	}
 
+	// 追加中转路由节点
 	fwdKeys := append([]string{dest.RecipientKeys[0]}, routingKeys...)
 
 	packedMsg, err := o.createPackedNestedForwards(msg, fwdKeys, forwardMsgType, mtProfile)

@@ -9,6 +9,40 @@ func LookupPublicKey(id string, didDoc *Doc) (*VerificationMethod, bool) {
 	return nil, false
 }
 
+func LookupService(didDoc *Doc, serviceType string) (*Service, bool) {
+	const notFound = -1
+	index := notFound
+
+	for i := range didDoc.Service {
+		if didDoc.Service[i].Type == serviceType {
+			if index == notFound || comparePriority(didDoc.Service[index].Priority, didDoc.Service[i].Priority) {
+				index = i
+			}
+		}
+	}
+
+	if index == notFound {
+		return nil, false
+	}
+
+	return &didDoc.Service[index], true
+}
+
+func comparePriority(v1, v2 interface{}) bool {
+	intV1, okV1 := v1.(int)
+	intV2, okV2 := v2.(int)
+
+	if okV1 && okV2 {
+		return intV1 > intV2
+	}
+
+	if !okV1 && !okV2 {
+		return false
+	}
+
+	return !okV1
+}
+
 func ContextPeekString(context Context) (string, bool) {
 	switch ctx := context.(type) {
 	case string:

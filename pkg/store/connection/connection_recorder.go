@@ -114,6 +114,14 @@ func (r *Recorder) SaveEvent(connectionID string, data []byte) error {
 	return r.protocolStateStore.Put(getEventDataKeyPrefix()(connectionID), data)
 }
 
+func (c *Recorder) GetEvent(connectionID string) ([]byte, error) {
+	if connectionID == "" {
+		return nil, fmt.Errorf(errMsgInvalidKey)
+	}
+
+	return c.protocolStateStore.Get(getEventDataKeyPrefix()(connectionID))
+}
+
 func NewRecorder(p provider) (*Recorder, error) {
 	lookup, err := NewLookup(p)
 	if err != nil {

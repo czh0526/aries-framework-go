@@ -69,3 +69,11 @@ type MessengerHandler interface {
 	Messenger
 	InboundMessenger
 }
+
+type NestedReplyOpts struct {
+	ThreadID string
+	MyDID    string
+	TheirDID string
+	MsgID    string
+	V        Version
+}

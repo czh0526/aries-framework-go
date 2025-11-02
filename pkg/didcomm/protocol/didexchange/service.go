@@ -1,6 +1,7 @@
 package didexchange
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/log"
@@ -16,6 +17,7 @@ import (
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
+	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
 )
 
 const (
@@ -102,6 +104,81 @@ type Service struct {
 	initialized        bool
 }
 
+func New(prov provider) (*Service, error) {
+	svc := Service{}
+
+	err := svc.Initialize(prov)
+	if err != nil {
+		return nil, err
+	}
+
+	return &svc, nil
+}
+
+func (s *Service) Initialize(p interface{}) error {
+	if s.initialized {
+		return nil
+	}
+
+	prov, ok := p.(provider)
+	if !ok {
+		return fmt.Errorf("expected provider of type `%T`, got type `%T`", provider(nil), p)
+	}
+
+	connRecorder, err := connection.NewRecorder(prov)
+	if err != nil {
+		return fmt.Errorf("failed to initialize connection recorder: %w", err)
+	}
+
+	routeSvcBase, err := prov.Service(mediator.Coordination)
+	if err != nil {
+		return err
+	}
+
+	routeSvc, ok := routeSvcBase.(mediator.ProtocolService)
+	if !ok {
+		return errors.New("cast service to Route Service failed")
+	}
+
+	const callbackChannelSize = 10
+
+	keyType := prov.KeyType()
+	if keyType == "" {
+		keyType = spikms.ED25519
+	}
+
+	keyAgreementType := prov.KeyAgreementType()
+	if keyAgreementType == "" {
+		keyAgreementType = spikms.X25519ECDHKWType
+	}
+
+	mediaTypeProfiles := prov.MediaTypeProfiles()
+	if len(mediaTypeProfiles) == 0 {
+		mediaTypeProfiles = []string{transport.MediaTypeAIP2RFC0019Profile}
+	}
+
+	s.ctx = &context{
+		outboundDispatcher: prov.OutboundDispatcher(),
+		crypto:             prov.Crypto(),
+		kms:                prov.KMS(),
+		vdRegistry:         prov.VDRegistry(),
+		connectionRecorder: connRecorder,
+		connectionStore:    prov.DIDConnectionStore(),
+		routeSvc:           routeSvc,
+		doACAPyInterop:     doACAPyInterop,
+		keyType:            keyType,
+		keyAgreementType:   keyAgreementType,
+		mediaTypeProfiles:  mediaTypeProfiles,
+	}
+
+	s.callbackChannel = make(chan *message, callbackChannelSize)
+
+	go s.startInternalListener()
+
+	s.initialized = true
+	return nil
+}
+
 func (s *Service) RespondTo(i *OOBInvitation, routerConnections []string) (string, error) {
 	i.Type = oobMsgType
 
@@ -122,6 +199,20 @@ func (s *Service) SaveInvitation(i *OOBInvitation) error {
 	logger.Debugf("save invitation %+v", i)
 
 	return nil
+}
+
+func retrievingRouterConnections(msg service.DIDCommMsg) []string {
+	raw, found := msg.Metadata()[routerConnsMetadataKey]
+	if !found {
+		return nil
+	}
+
+	connections, ok := raw.([]string)
+	if !ok {
+		return nil
+	}
+
+	return connections
 }
 
 func (s *Service) HandleInbound(msg service.DIDCommMsg, ctx service.DIDCommContext) (string, error) {
@@ -182,70 +273,36 @@ func (s *Service) Name() string {
 	return DIDExchange
 }
 
-func (s *Service) Initialize(p interface{}) error {
-	if s.initialized {
-		return nil
-	}
+func (s *Service) CreateConnection(record *connection.Record, theirDID *did.Doc) error {
+	logger.Debugf("creating connection using record [%+v] and theirDID [%+v]", record, theirDID)
 
-	prov, ok := p.(provider)
-	if !ok {
-		return fmt.Errorf("expected provider of type `%T`, got type `%T`", provider(nil), p)
-	}
-
-	connRecorder, err := connection.NewRecorder(prov)
-	if err != nil {
-		return fmt.Errorf("failed to initialize connection recorder: %w", err)
-	}
-
-	routeSvcBase, err := prov.Service(mediator.Coordination)
+	didMethod, err := vdr.GetDidMethod(theirDID.ID)
 	if err != nil {
 		return err
 	}
 
-	routeSvc, ok := routeSvcBase.(mediator.ProtocolService)
-	if !ok {
-		return errors.New("cast service to Route Service failed")
+	_, err = s.ctx.vdRegistry.Create(didMethod, theirDID, spivdr.WithOption("store", true))
+	if err != nil {
+		return fmt.Errorf("vdr failed to store theirDID: %w", err)
 	}
 
-	const callbackChannelSize = 10
-
-	keyType := prov.KeyType()
-	if keyType == "" {
-		keyType = spikms.ED25519
+	err = s.connectionStore.SaveDIDFromDoc(theirDID)
+	if err != nil {
+		return fmt.Errorf("failed to save theirDID to the did.ConnectionStore: %w", err)
 	}
 
-	keyAgreementType := prov.KeyAgreementType()
-	if keyAgreementType == "" {
-		keyAgreementType = spikms.X25519ECDHKWType
+	err = s.connectionStore.SaveDIDByResolving(record.MyDID)
+	if err != nil {
+		return fmt.Errorf("failed to save myDID to the did.ConnectionStore: %w", err)
 	}
 
-	mediaTypeProfiles := prov.MediaTypeProfiles()
-	if len(mediaTypeProfiles) == 0 {
-		mediaTypeProfiles = []string{transport.MediaTypeAIP2RFC0019Profile}
+	if isDIDCommV2(record.MediaTypeProfiles) {
+		record.DIDCommVersion = service.V2
+	} else {
+		record.DIDCommVersion = service.V1
 	}
 
-	s.ctx = &context{
-		outboundDispatcher: prov.OutboundDispatcher(),
-		crypto:             prov.Crypto(),
-		kms:                prov.KMS(),
-		vdRegistry:         prov.VDRegistry(),
-		connectionRecorder: connRecorder,
-		connectionStore:    prov.DIDConnectionStore(),
-		routeSvc:           routeSvc,
-		doACAPyInterop:     doACAPyInterop,
-		keyType:            keyType,
-		keyAgreementType:   keyAgreementType,
-		mediaTypeProfiles:  mediaTypeProfiles,
-	}
-
-	s.callbackChannel = make(chan *message, callbackChannelSize)
-	s.connectionRecorder = connRecorder
-	s.connectionStore = prov.DIDConnectionStore()
-
-	go s.startInternalListener()
-
-	s.initialized = true
-	return nil
+	return s.connectionRecorder.SaveConnectionRecord(record)
 }
 
 func (s *Service) startInternalListener() {
@@ -414,6 +471,59 @@ func (s *Service) update(msgType string, record *connection.Record) error {
 	return s.connectionRecorder.SaveConnectionRecord(record)
 }
 
+func (s *Service) abandon(thID string, msg service.DIDCommMsg, processErr error) error {
+	nsThID, err := connection.CreateNamespaceKey(findNamespace(msg.Type()), thID)
+	if err != nil {
+		return err
+	}
+
+	connRec, err := s.connectionRecorder.GetConnectionRecordByNSThreadID(nsThID)
+	if err != nil {
+		return fmt.Errorf("unable to update the state to abandoned: %w", err)
+	}
+
+	connRec.State = (&abandoned{}).Name()
+
+	err = s.update(msg.Type(), connRec)
+	if err != nil {
+		return fmt.Errorf("unable to update the state to abandoned: %w", err)
+	}
+
+	s.sendMsgEvents(&service.StateMsg{
+		ProtocolName: DIDExchange,
+		Type:         service.PostState,
+		Msg:          msg,
+		StateID:      StateIDAbandoned,
+		Properties:   createErrorEventProperties(connRec.ConnectionID, "", processErr),
+	})
+
+	return nil
+}
+
+func (s *Service) storeEventProtocolStateData(msg *message) error {
+	bytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("store protocol state data: %w", err)
+	}
+
+	return s.connectionRecorder.SaveEvent(msg.ConnRecord.ConnectionID, bytes)
+}
+
+func (s *Service) getEventProtocolStateData(connectionID string) (*message, error) {
+	val, err := s.connectionRecorder.GetEvent(connectionID)
+	if err != nil {
+		return nil, fmt.Errorf("get event protocol state data: %w", err)
+	}
+
+	msg := &message{}
+	err = json.Unmarshal(val, msg)
+	if err != nil {
+		return nil, fmt.Errorf("get protocol state data: %w", err)
+	}
+
+	return msg, nil
+}
+
 func (s *Service) processCallback(msg *message) {
 	s.callbackChannel <- msg
 }
@@ -484,6 +594,15 @@ func createEventProperties(connectionID, invitationID string) *didExchangeEvent 
 	}
 }
 
+func createErrorEventProperties(connectionID, invitationID string, err error) *didExchangeEventError {
+	props := createEventProperties(connectionID, invitationID)
+
+	return &didExchangeEventError{
+		didExchangeEvent: *props,
+		err:              err,
+	}
+}
+
 func (s *Service) oobInvitationMsgRecord(msg service.DIDCommMsg) (*connection.Record, error) {
 	return nil, errors.New("not implemented")
 }
@@ -504,15 +623,6 @@ func (s *Service) fetchConnectionRecord(prefix string, msg service.DIDCommMsg) (
 	return nil, errors.New("not implemented")
 }
 
-func (s *Service) CreateConnection(record *connection.Record, theirDID *did.Doc) error {
-	logger.Debugf("creating connection using record [%+v] and theirDID [%+v]", record, theirDID)
-
-	didMethod, err := vdr.GetDidMethod(theirDID.ID)
-	if err != nil {
-		return err
-	}
-}
-
 func isNoOp(s state) bool {
 	_, ok := s.(*noOp)
 	return ok
@@ -525,6 +635,11 @@ func findNamespace(msgType string) string {
 	}
 
 	return namespace
+}
+
+func canTriggerActionEvents(stateID, ns string) bool {
+	return (stateID == StateIDInvited && ns == myNSPrefix) ||
+		(stateID == StateIDRequested && ns == theirNSPrefix)
 }
 
 var _ dispatcher.ProtocolService = (*Service)(nil)

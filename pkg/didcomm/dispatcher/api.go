@@ -22,3 +22,8 @@ type Outbound interface {
 
 	Forward(interface{}, *service.Destination) error
 }
+
+type MessageTypeTarget struct {
+	MsgType string
+	Target  string
+}

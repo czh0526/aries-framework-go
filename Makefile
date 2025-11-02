@@ -12,6 +12,8 @@ gen-proto:
 gen-mock:
 	mockgen -destination pkg/internal/gomocks/spi/storage/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/spi/storage Provider,Store
 	mockgen -destination pkg/internal/gomocks/didcomm/common/service/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/pkg/didcomm/common/service Messenger,MessengerHandler
+	mockgen -destination pkg/internal/gomocks/didcomm/messenger/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/pkg/didcomm/messenger Provider
+	mockgen -destination pkg/internal/gomocks/didcomm/dispatcher/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher Outbound
 
 .PHONE: build
 build:
