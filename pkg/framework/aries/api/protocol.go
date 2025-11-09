@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
@@ -12,6 +13,8 @@ import (
 	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 )
+
+var ErrSvcNotFound = errors.New("service not found")
 
 type Provider interface {
 	OutboundDispatcher() dispatcher.Outbound
@@ -34,7 +37,7 @@ type Provider interface {
 	KeyAgreementType() spikms.KeyType
 	MediaTypeProfiles() []string
 	AriesFrameworkID() string
-	ServiceMsgTypTargets() []dispatcher.MessageTypeTarget
+	ServiceMsgTypeTargets() []dispatcher.MessageTypeTarget
 }
 
 type ProtocolSvcCreator struct {

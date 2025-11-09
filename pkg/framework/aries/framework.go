@@ -9,10 +9,12 @@ import (
 	"github.com/czh0526/aries-framework-go/component/vdr/key"
 	"github.com/czh0526/aries-framework-go/component/vdr/peer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/inbound"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/outbound"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packager"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
+	"github.com/czh0526/aries-framework-go/pkg/framework/aries/api"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -28,23 +30,36 @@ const (
 )
 
 type Aries struct {
-	id                  string
-	kms                 spikms.KeyManager
-	kmsCreator          spikms.Creator
-	crypto              spicrypto.Crypto
-	vdr                 []vdrapi.VDR
-	vdrRegistry         vdrapi.Registry
-	storeProvider       spistorage.Provider
-	contextStore        ldstore.ContextStore
-	remoteProviderStore ldstore.RemoteProviderStore
-	documentLoader      jsonld.DocumentLoader
-	packerCreator       packer.Creator
-	packerCreators      []packer.Creator
-	packagerCreator     packager.Creator
-	mediaTypeProfiles   []string
-	outboundDispatcher  dispatcher.Outbound
-	outboundTransports  []transport.OutboundTransport
-	inboundTransports   []transport.InboundTransport
+	id string
+	// store
+	storeProvider              spistorage.Provider
+	protocolStateStoreProvider spistorage.Provider
+	contextStore               ldstore.ContextStore
+	remoteProviderStore        ldstore.RemoteProviderStore
+	// crypto + kms
+	crypto           spicrypto.Crypto
+	kmsCreator       spikms.Creator
+	kms              spikms.KeyManager
+	keyType          spikms.KeyType
+	keyAgreementType spikms.KeyType
+	// vdr
+	vdr               []vdrapi.VDR
+	vdrRegistry       vdrapi.Registry
+	documentLoader    jsonld.DocumentLoader
+	packerCreator     packer.Creator
+	packerCreators    []packer.Creator
+	packagerCreator   packager.Creator
+	packager          transport.Packager
+	mediaTypeProfiles []string
+	// outbound
+	outboundTransports []transport.OutboundTransport
+	outboundDispatcher dispatcher.Outbound
+	// inbound
+	inboundTransports      []transport.InboundTransport
+	inboundEnvelopeHandler inbound.MessageHandler
+	// service
+	protocolSvcCreators []api.ProtocolSvcCreator
+	services            []dispatcher.ProtocolService
 }
 
 type Option func(opts *Aries) error
@@ -63,7 +78,8 @@ func New(opts ...Option) (*Aries, error) {
 	// 设置 id
 	aries.id = uuid.New().String()
 
-	// 设置 store provider
+	// 设置 store provider, 各种 store，
+	// crypto, kmsCreator, packer, packager
 	err := defFrameworkOpts(aries)
 	if err != nil {
 		return nil, fmt.Errorf("default option initialization failed: %w", err)
@@ -72,7 +88,7 @@ func New(opts ...Option) (*Aries, error) {
 	return initializeServices(aries)
 }
 
-func (a *Aries) Context() (*context.Provider, error) {
+func (a *Aries) Context() (*context.Context, error) {
 	return context.New(
 		context.WithKMS(a.kms),
 		context.WithCrypto(a.crypto))
@@ -122,9 +138,9 @@ func initializeServices(aries *Aries) (*Aries, error) {
 		return nil, err
 	}
 
-	//if err := loadServices(aries); err != nil {
-	//	return nil, err
-	//}
+	if err := loadServices(aries); err != nil {
+		return nil, err
+	}
 
 	if err := startTransports(aries); err != nil {
 		return nil, err
@@ -331,5 +347,71 @@ func createPackersAndPackager(aries *Aries) error {
 }
 
 func createOutboundDispatcher(aries *Aries) error {
+	ctx, err := context.New(
+		context.WithKMS(aries.kms),
+		context.WithCrypto(aries.crypto),
+		context.WithOutboundTransports(aries.outboundTransports...),
+		context.WithPackager(aries.packager),
+	)
+	if err != nil {
+		return fmt.Errorf("context creation failed: %w", err)
+	}
+
 	aries.outboundDispatcher, err = outbound.NewOutbound(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to init outbound dispatcher: %w", err)
+	}
+
+	return nil
+}
+
+func WithProtocols(protocolSvcCreator ...api.ProtocolSvcCreator) Option {
+	return func(aries *Aries) error {
+		aries.protocolSvcCreators = append(aries.protocolSvcCreators, protocolSvcCreator...)
+		return nil
+	}
+}
+
+func loadServices(aries *Aries) error {
+	// 构建 inbound message handler
+	aries.inboundEnvelopeHandler = inbound.MessageHandler{}
+
+	ctx, err := context.New(
+		context.WithOutboundDispatcher(aries.outboundDispatcher),
+	)
+	if err != nil {
+		return fmt.Errorf("create context failed: %w", err)
+	}
+
+	for i, v := range aries.protocolSvcCreators {
+		svc, svcErr := v.Create(ctx)
+		if svcErr != nil {
+			return fmt.Errorf("new protocol service failed: %w", svcErr)
+		}
+
+		aries.services = append(aries.services, svc)
+
+		if e := context.WithProtocolServices(aries.services...)(ctx); e != nil {
+			return e
+		}
+
+		aries.protocolSvcCreators[i].ServicePointer = svc
+	}
+
+	// 初始化 inbound message handler
+	aries.inboundEnvelopeHandler.Initialize(ctx)
+
+	for _, v := range aries.protocolSvcCreators {
+		if init := v.Init; init != nil {
+			if e := init(v.ServicePointer, ctx); e != nil {
+				return e
+			}
+		} else {
+			if e := v.ServicePointer.Initialize(ctx); e != nil {
+				return e
+			}
+		}
+	}
+
+	return nil
 }

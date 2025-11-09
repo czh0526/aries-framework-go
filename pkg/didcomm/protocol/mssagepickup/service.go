@@ -11,6 +11,10 @@ import (
 )
 
 const (
+	MessagePickup = "messagepickup"
+)
+
+const (
 	Namespace = "mailbox"
 )
 
@@ -83,4 +87,8 @@ func (s *Service) Initialize(p interface{}) error {
 
 	s.initialized = true
 	return nil
+}
+
+func (s *Service) Name() string {
+	return MessagePickup
 }
