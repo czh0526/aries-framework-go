@@ -1,0 +1,5 @@
+package vcwallet
+
+func main() {
+
+}
