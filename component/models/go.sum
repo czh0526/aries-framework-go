@@ -19,6 +19,8 @@ github.com/consensys/bavard v0.1.13 h1:oLhMLOFGTLdlda/kma4VOJazblc7IM5y5QPd2A/Yj
 github.com/consensys/bavard v0.1.13/go.mod h1:9ItSMtA/dXMAiL7BG6bqW2m3NdSEObYWoH223nGHukI=
 github.com/consensys/gnark-crypto v0.9.1 h1:mru55qKdWl3E035hAoh1jj9d7hVnYY5pfb6tmovSmII=
 github.com/consensys/gnark-crypto v0.9.1/go.mod h1:a2DQL4+5ywF6safEeZFEPGRiiGbjzGFRUN2sg06VuU4=
+github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3 h1:anIgodiXzIDlD2StaJhYY/xIvFGSG+aSaRWAvoVoyMU=
+github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:uz3JDrhofy0ctTnzardPztdpIpJHoynC/PQz8x0MkyQ=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789 h1:ipTJbK7ohvX1B5J8bSZ7659tlH7Z5BW2ezG8zILpUzI=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789/go.mod h1:2YjcrX4BqVSy3Sq92jd93SlQWh6c8tEJp1uVuItwGdg=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

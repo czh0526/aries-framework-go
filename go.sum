@@ -25,6 +25,8 @@ github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35e
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789/go.mod h1:2YjcrX4BqVSy3Sq92jd93SlQWh6c8tEJp1uVuItwGdg=
 github.com/czh0526/aries-framework-go/component/storage v0.0.0-20250704110927-1a7734733494 h1:U5LEmIiLFZTmHnc32rzoeehqGLh2vGbCvy9yYsqcpjQ=
 github.com/czh0526/aries-framework-go/component/storage v0.0.0-20250704110927-1a7734733494/go.mod h1:h+8B5xXdnmub6zWWcVDaaYGqWhMzPhQE/W0XCyoNkqA=
+github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3 h1:eP/PqF5PVmFoQ/otGKCDokr0KMx7k5WhRwDy2GFGV1w=
+github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:SQHu2vDt2bq/QsZaVJA78qCbC6Sr/Plmtj0tEAVuTUU=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

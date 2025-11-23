@@ -1,8 +1,16 @@
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
+github.com/czh0526/aries-framework-go v0.0.0-20251109075726-c35d6e52984f h1:RH+fakJeDH4wX8jFX2bUns3OHhVCn1IX1gdZeV+tFok=
+github.com/czh0526/aries-framework-go v0.0.0-20251109075726-c35d6e52984f/go.mod h1:CYBGBt/hQQt6hxFEMtITCOcr47/pYZbeMERl6cFeiGM=
+github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3 h1:anIgodiXzIDlD2StaJhYY/xIvFGSG+aSaRWAvoVoyMU=
+github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:uz3JDrhofy0ctTnzardPztdpIpJHoynC/PQz8x0MkyQ=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20251109075726-c35d6e52984f h1:jqbdSmdEzPh6axQz7Z3H6ff4Jnj2OLTgITMpVQuElcI=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20251109075726-c35d6e52984f/go.mod h1:aPR3AYkObR8BE84gxnP4NvgzH5esfchGcWqeEif8DIU=
+github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123140137-a11a60fb08e3 h1:o9T18gFqHY52GFvNWdpm5y1cXiVInO0bxPbJDHhbyws=
+github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:aPR3AYkObR8BE84gxnP4NvgzH5esfchGcWqeEif8DIU=
 github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42 h1:V59qQgzZpfzbSLEJ33HuWCo8Zpry/6XCI6jVArTS2AQ=
 github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=
+github.com/czh0526/aries-framework-go/spi v0.0.0-20250704014650-3af35ecb5789 h1:V5Flk7le+Vt7buQxCRmAF8v5f0HlG67XCZOu6D8kjv4=
+github.com/czh0526/aries-framework-go/spi v0.0.0-20250704014650-3af35ecb5789/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gorilla/mux v1.8.1 h1:TuBL49tXwgrFYWhqrNgrUNEY92u81SPhu7sTdzQEiWY=

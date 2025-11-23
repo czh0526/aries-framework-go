@@ -1,0 +1,4 @@
+github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123140137-a11a60fb08e3 h1:o9T18gFqHY52GFvNWdpm5y1cXiVInO0bxPbJDHhbyws=
+github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:aPR3AYkObR8BE84gxnP4NvgzH5esfchGcWqeEif8DIU=
+github.com/czh0526/aries-framework-go/spi v0.0.0-20251123140137-a11a60fb08e3 h1:KGQ5o2RgMl5tihZMxrfWFlAnNDTYPrNjgqWlElZ9a4c=
+github.com/czh0526/aries-framework-go/spi v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=

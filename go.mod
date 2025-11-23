@@ -3,10 +3,10 @@ module github.com/czh0526/aries-framework-go
 go 1.23.7
 
 require (
-	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20250704101502-9a775bcd4677
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20250704014650-3af35ecb5789
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-00010101000000-000000000000
-	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-00010101000000-000000000000
+	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20250704014650-3af35ecb5789
 	github.com/google/uuid v1.3.0
 	github.com/stretchr/testify v1.10.0
@@ -56,10 +56,9 @@ require (
 )
 
 replace (
-	github.com/czh0526/aries-framework-go => ./
 	github.com/czh0526/aries-framework-go/component/kmscrypto => ./component/kmscrypto
 	github.com/czh0526/aries-framework-go/component/models => ./component/models
 	github.com/czh0526/aries-framework-go/component/storage/mysql => ./component/storage/mysql
-	github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
+	//github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
 	github.com/czh0526/aries-framework-go/spi => ./spi
 )
