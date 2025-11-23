@@ -29,8 +29,8 @@ github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e86
 github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a/go.mod h1:STU7NeYzbjxKjF2wP/r+DT76Y0N5EH0Rs6v6hkiemnU=
 github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd h1:uJmvr9mkzFb6uJCKauHz+ZGShj8UTsFBjui/6ZkxCo8=
 github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd/go.mod h1:h+8B5xXdnmub6zWWcVDaaYGqWhMzPhQE/W0XCyoNkqA=
-github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123150327-e865d0a2866a h1:T14fTS9Zg0W0LGbVMC6CtbzZsyc8wkuDsPvKuhnhnPA=
-github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123150327-e865d0a2866a/go.mod h1:A0sxfq3mVBNWrLGfLxOIIfvhKTBudDuyiAIrA8G6MZU=
+github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976 h1:OnOGj4JLEIctaLZRX9F42rI4xNcbf+Teb8mU+73bCWc=
+github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976/go.mod h1:nhusnqmqRhnWmwNZJ2kOMGbXrbmL9ZyNFiX4fUyP6/8=
 github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251123150327-e865d0a2866a h1:fJk67gYemlS4Zcs7LNRlssJmulpRz/de+DjF7sKZGiA=
 github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251123150327-e865d0a2866a/go.mod h1:ccNLp6ZWJPx+PL97EaALZk9ELzQe/bCY5UuzxmxP2bA=
 github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3 h1:eP/PqF5PVmFoQ/otGKCDokr0KMx7k5WhRwDy2GFGV1w=
