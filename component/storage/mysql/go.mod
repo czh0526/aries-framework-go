@@ -1,4 +1,4 @@
-module github.com/czh0526/aries-framework-go/storage/mysql
+module github.com/czh0526/aries-framework-go/component/storage/mysql
 
 go 1.23.7
 
