@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/log"
 	"github.com/czh0526/aries-framework-go/pkg/controller/rest"
-	"github.com/czh0526/aries-framework-go/pkg/didcomm/messaging/msghandler"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"net/http"
@@ -95,9 +94,11 @@ func (params *AgentParameters) NewRouter() (*mux.Router, error) {
 	var handlers []rest.Handler
 
 	router := mux.NewRouter()
-	for _, handler := range handlers {
-		router.HandleFunc(handler.P)
-	}
+	//for _, handler := range handlers {
+	//	router.HandleFunc(handler.P)
+	//}
+
+	return router, nil
 }
 
 func NewAgentParameters(server server, cmd *cobra.Command) (*AgentParameters, error) {

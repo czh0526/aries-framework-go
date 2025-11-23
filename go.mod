@@ -1,13 +1,12 @@
 module github.com/czh0526/aries-framework-go
 
-go 1.23.7
+go 1.23.9
 
 require (
 	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3
-	github.com/czh0526/aries-framework-go/component/models v0.0.0-20250704014650-3af35ecb5789
-	github.com/czh0526/aries-framework-go/component/storage/mysql latest
+	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a
 	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3
-	github.com/czh0526/aries-framework-go/spi v0.0.0-20250704014650-3af35ecb5789
+	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
 	github.com/google/uuid v1.3.0
 	github.com/stretchr/testify v1.10.0
 )
@@ -16,7 +15,9 @@ require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
-	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20250704110927-1a7734733494
+	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd
+	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123150327-e865d0a2866a
+	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251123150327-e865d0a2866a
 	github.com/go-jose/go-jose v2.6.3+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang/mock v1.6.0
@@ -53,12 +54,4 @@ require (
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
-)
-
-replace (
-	github.com/czh0526/aries-framework-go/component/kmscrypto => ./component/kmscrypto
-	github.com/czh0526/aries-framework-go/component/models => ./component/models
-	//github.com/czh0526/aries-framework-go/component/storage/mysql => ./component/storage/mysql
-	github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
-	github.com/czh0526/aries-framework-go/spi => ./spi
 )

@@ -8,11 +8,4 @@ require (
 	github.com/stretchr/testify v1.10.0
 )
 
-require (
-
-)
-
-replace (
-	github.com/czh0526/aries-framework-go/spi => ../../spi
-	github.com/czh0526/aries-framework-go/component/models => ../models
-)
+require github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a // indirect

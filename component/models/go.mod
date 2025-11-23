@@ -39,8 +39,3 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-
-replace (
-	github.com/czh0526/aries-framework-go/component/kmscrypto => ../kmscrypto
-	github.com/czh0526/aries-framework-go/spi => ../../spi
-)

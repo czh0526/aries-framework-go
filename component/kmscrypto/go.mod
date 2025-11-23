@@ -7,7 +7,7 @@ require (
 	github.com/btcsuite/btcd v0.22.3
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
-	github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42
+	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
@@ -30,5 +30,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
-
-replace github.com/czh0526/aries-framework-go/spi => ../../spi
