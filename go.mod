@@ -59,6 +59,6 @@ replace (
 	github.com/czh0526/aries-framework-go/component/kmscrypto => ./component/kmscrypto
 	github.com/czh0526/aries-framework-go/component/models => ./component/models
 	//github.com/czh0526/aries-framework-go/component/storage/mysql => ./component/storage/mysql
-	//github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
+	github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
 	github.com/czh0526/aries-framework-go/spi => ./spi
 )
