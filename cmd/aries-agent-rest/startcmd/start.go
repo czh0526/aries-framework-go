@@ -215,10 +215,10 @@ func getDBParam(cmd *cobra.Command) (*dbParam, error) {
 	return dbParam, nil
 }
 
-func startAgent(parameters *AgentParameters) error {
-	logger.Infof("Starting aries agent rest on host [%s]", parameters.host)
+func startAgent(params *AgentParameters) error {
+	logger.Infof("Starting aries agent rest on host [%s]", params.host)
 
-	router, err := parameters.NewRouter()
+	router, err := params.NewRouter()
 	if err != nil {
 		return err
 	}
@@ -226,9 +226,14 @@ func startAgent(parameters *AgentParameters) error {
 	handler := cors.New(
 		cors.Options{
 			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodHead},
-			AllowedHeaders: []string{"Authorization", "Content-Type"},
+			AllowedHeaders: []string{"Origin", "Accept", "X-Requested-With", "Authorization", "Content-Type"},
 		},
 	).Handler(router)
+
+	err = params.server.ListenAndServe(params.host, handler, "", "")
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
