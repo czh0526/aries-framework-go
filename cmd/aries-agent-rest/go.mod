@@ -48,3 +48,7 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace (
+	"github.com/czh0526/aries-framework-go" => "../../"
+)
