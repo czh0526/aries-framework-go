@@ -3,7 +3,7 @@ module github.com/czh0526/aries-framework-go/cmd/aies-agent-rest
 go 1.23.9
 
 require (
-	github.com/czh0526/aries-framework-go v0.0.0-20251125095507-29198d101e1e
+	github.com/czh0526/aries-framework-go v0.0.0-20251125104027-0553d3cc93aa
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
 	github.com/gorilla/mux v1.8.1
