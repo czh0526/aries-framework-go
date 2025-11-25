@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/log"
 	"github.com/czh0526/aries-framework-go/pkg/controller"
+	"github.com/czh0526/aries-framework-go/pkg/framework/aries"
+	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	"net/http"
 	"os"
@@ -107,7 +110,16 @@ func (params *AgentParameters) NewRouter() (*mux.Router, error) {
 		return nil, errMissingHost
 	}
 
-	handlers, err := controller.GetHandlers(params.server)
+	ctx, err := createAriesAgent(params)
+	if err != nil {
+		return nil, err
+	}
+
+	handlers, err := controller.GetRestHandlers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start aries agent rest on port [%s], "+
+			"failed to get rest service api: %w", params.host, err)
+	}
 
 	router := mux.NewRouter()
 	for _, handler := range handlers {
@@ -115,6 +127,21 @@ func (params *AgentParameters) NewRouter() (*mux.Router, error) {
 	}
 
 	return router, nil
+}
+
+func createAriesAgent(params *AgentParameters) (*context.Context, error) {
+
+	framework, err := aries.New()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create aries agent: %w", err)
+	}
+
+	ctx, err := framework.Context()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create aries agent: %w", err)
+	}
+
+	return ctx, nil
 }
 
 func NewAgentParameters(server server, cmd *cobra.Command) (*AgentParameters, error) {
@@ -192,5 +219,16 @@ func startAgent(parameters *AgentParameters) error {
 	logger.Infof("Starting aries agent rest on host [%s]", parameters.host)
 
 	router, err := parameters.NewRouter()
+	if err != nil {
+		return err
+	}
+
+	handler := cors.New(
+		cors.Options{
+			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodHead},
+			AllowedHeaders: []string{"Authorization", "Content-Type"},
+		},
+	).Handler(router)
+
 	return nil
 }
