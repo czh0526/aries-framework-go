@@ -65,10 +65,10 @@ type Service struct {
 	vdRegistry           vdrapi.Registry
 	keylistUpdateMap     map[string]chan *KeylistUpdateResponse
 	keylistUpdateMapLock sync.RWMutex
-	callbacks            chan *callback
-	messagePickupSvc     messagepickup.ProtocolService
-	keyAgreementType     spikms.KeyType
-	mediaTypeProfiles    []string
-	initialized          bool
-	debugDisableBackoff  bool
+	//callbacks            chan *callback
+	messagePickupSvc    messagepickup.ProtocolService
+	keyAgreementType    spikms.KeyType
+	mediaTypeProfiles   []string
+	initialized         bool
+	debugDisableBackoff bool
 }
