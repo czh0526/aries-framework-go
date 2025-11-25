@@ -1,4 +1,4 @@
-package cotroller
+package controller
 
 import (
 	"github.com/czh0526/aries-framework-go/pkg/controller/rest"
@@ -31,7 +31,7 @@ func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) 
 
 	kmscmd := kmsrest.New(ctx)
 	// wallet := vcwalletrest.New(ctx)
-	
+
 	var allHandlers []rest.Handler
 	allHandlers = append(allHandlers, kmscmd.GetRESTHandlers()...)
 

@@ -1,17 +1,17 @@
 package startcmd
 
 import (
+	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/log"
-	"github.com/czh0526/aries-framework-go/pkg/controller/rest"
+	"github.com/czh0526/aries-framework-go/pkg/controller"
+	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 	"net/http"
 	"os"
 	"strconv"
 )
-
-var logger = log.New("aries-framework/agent-rest")
 
 const (
 	agentHostEnvKey        = "ARIES_API_HOST"
@@ -36,6 +36,22 @@ const (
 	databaseTimeoutFlagUsage = " Default: " + databaseTimeoutDefault + " seconds." +
 		" Alternatively, this can be set with the following environment variable: " + databaseTimeoutEnvKey
 	databaseTimeoutDefault = "30"
+)
+
+var (
+	errMissingHost = errors.New("host not provided")
+	logger         = log.New("aries-framework/agent-rest")
+
+	keyTypes = map[string]spikms.KeyType{
+		"ed25519":           spikms.ED25519Type,
+		"ecdsap256ieee1363": spikms.ECDSAP256IEEEP1363,
+		"ecdsap256der":      spikms.ECDSAP256DER,
+	}
+
+	keyAgreementTypes = map[string]spikms.KeyType{
+		"x25519kw": spikms.X25519ECDHKWType,
+		"p256kw":   spikms.NISTP256ECDHKWType,
+	}
 )
 
 type server interface {
@@ -91,12 +107,12 @@ func (params *AgentParameters) NewRouter() (*mux.Router, error) {
 		return nil, errMissingHost
 	}
 
-	var handlers []rest.Handler
+	handlers, err := controller.GetHandlers(params.server)
 
 	router := mux.NewRouter()
-	//for _, handler := range handlers {
-	//	router.HandleFunc(handler.P)
-	//}
+	for _, handler := range handlers {
+		router.HandleFunc(handler.Path(), handler.Handle()).Methods(handler.Method())
+	}
 
 	return router, nil
 }
