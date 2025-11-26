@@ -16,7 +16,7 @@ func main() {
 
 	logger := log.New("aries-agent-rest")
 
-	startCmd, err := startcmd.Cmd(nil)
+	startCmd, err := startcmd.Cmd(&startcmd.HTTPServer{})
 	if err != nil {
 		logger.Fatalf(err.Error())
 	}

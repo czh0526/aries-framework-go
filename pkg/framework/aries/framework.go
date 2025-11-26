@@ -2,6 +2,7 @@ package aries
 
 import (
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
 	"github.com/czh0526/aries-framework-go/component/models/ld/documentloader"
 	ldstore "github.com/czh0526/aries-framework-go/component/models/ld/store"
 	"github.com/czh0526/aries-framework-go/component/vdr"
@@ -39,6 +40,7 @@ type Aries struct {
 	// crypto + kms
 	crypto           spicrypto.Crypto
 	kmsCreator       spikms.Creator
+	secretLock       spisecretlock.Service
 	kms              spikms.KeyManager
 	keyType          spikms.KeyType
 	keyAgreementType spikms.KeyType
@@ -194,9 +196,30 @@ func WithInboundTransport(inboundTransport ...transport.InboundTransport) Option
 	}
 }
 
+func WithStoreProvider(storeProvider spistorage.Provider) Option {
+	return func(aries *Aries) error {
+		aries.storeProvider = storeProvider
+		return nil
+	}
+}
+
 func WithCrypto(c spicrypto.Crypto) Option {
 	return func(aries *Aries) error {
 		aries.crypto = c
+		return nil
+	}
+}
+
+func WithKM(k spikms.Creator) Option {
+	return func(aries *Aries) error {
+		aries.kmsCreator = k
+		return nil
+	}
+}
+
+func WithSecretLock(s spisecretlock.Service) Option {
+	return func(aries *Aries) error {
+		aries.secretLock = s
 		return nil
 	}
 }
@@ -227,9 +250,15 @@ func WithVDR(v vdrapi.VDR) Option {
 }
 
 func createKMS(aries *Aries) error {
-	var err error
+	ariesProviderKMSStoreWrapper, err := kms.NewAriesProviderWrapper(aries.storeProvider)
+	if err != nil {
+		return fmt.Errorf("create Aries provider KMS store wrapper failed: %w", err)
+	}
 
-	kmsProv := &kmsProvider{}
+	kmsProv := &kmsProvider{
+		kmsStore:          ariesProviderKMSStoreWrapper,
+		secretLockService: aries.secretLock,
+	}
 
 	aries.kms, err = aries.kmsCreator(kmsProv)
 	if err != nil {
@@ -352,6 +381,8 @@ func createOutboundDispatcher(aries *Aries) error {
 		context.WithCrypto(aries.crypto),
 		context.WithOutboundTransports(aries.outboundTransports...),
 		context.WithPackager(aries.packager),
+		context.WithStorageProvider(aries.storeProvider),
+		context.WithProtocolStateStorageProvider(aries.protocolStateStoreProvider),
 	)
 	if err != nil {
 		return fmt.Errorf("context creation failed: %w", err)
