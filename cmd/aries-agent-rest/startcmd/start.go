@@ -3,17 +3,21 @@ package startcmd
 import (
 	"errors"
 	"fmt"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/czh0526/aries-framework-go/component/log"
+	"github.com/czh0526/aries-framework-go/component/storage/mysql"
 	"github.com/czh0526/aries-framework-go/pkg/controller"
 	"github.com/czh0526/aries-framework-go/pkg/framework/aries"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
+	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
 const (
@@ -39,6 +43,9 @@ const (
 	databaseTimeoutFlagUsage = " Default: " + databaseTimeoutDefault + " seconds." +
 		" Alternatively, this can be set with the following environment variable: " + databaseTimeoutEnvKey
 	databaseTimeoutDefault = "30"
+
+	databaseTypeMemOption   = "mem"
+	databaseTypeMySQLOption = "mysql"
 )
 
 var (
@@ -57,8 +64,27 @@ var (
 	}
 )
 
+var supportedStorageProviders = map[string]func(prefix string) (spistorage.Provider, error){
+	//databaseTypeMemOption: func(_ string) (spistorage.Provider, error) {
+	//	return mem.NewProvider(), nil
+	//},
+	databaseTypeMySQLOption: func(path string) (spistorage.Provider, error) {
+		return mysql.NewProvider(path)
+	},
+}
+
 type server interface {
 	ListenAndServe(host string, router http.Handler, certFile, keyFile string) error
+}
+
+type HTTPServer struct{}
+
+func (s *HTTPServer) ListenAndServe(host string, router http.Handler, certFile, keyFile string) error {
+	if certFile != "" && keyFile != "" {
+		return http.ListenAndServeTLS(host, certFile, keyFile, router)
+	}
+
+	return http.ListenAndServe(host, router)
 }
 
 func Cmd(server server) (*cobra.Command, error) {
@@ -129,9 +155,45 @@ func (params *AgentParameters) NewRouter() (*mux.Router, error) {
 	return router, nil
 }
 
-func createAriesAgent(params *AgentParameters) (*context.Context, error) {
+func createStoreProviders(params *AgentParameters) (spistorage.Provider, error) {
+	provider, supported := supportedStorageProviders[params.dbParam.dbType]
+	if !supported {
+		return nil, fmt.Errorf("key database type not set to a valid type")
+	}
 
-	framework, err := aries.New()
+	var store spistorage.Provider
+
+	err := backoff.RetryNotify(
+		func() error {
+			var err error
+			store, err = provider(params.dbParam.prefix)
+			return err
+		},
+		backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), params.dbParam.timeout),
+		func(err error, d time.Duration) {
+			logger.Warnf("failed to connect to storage, will sleep for %s before trying again: %s\n",
+				d, err)
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to storage at %s: %w", params.dbParam.prefix, err)
+	}
+
+	return store, nil
+}
+
+func createAriesAgent(params *AgentParameters) (*context.Context, error) {
+	var opts []aries.Option
+
+	storePro, err := createStoreProviders(params)
+	if err != nil {
+		return nil, err
+	}
+
+	opts = append(opts, aries.WithStoreProvider(storePro))
+
+	framework, err := aries.New(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aries agent: %w", err)
 	}

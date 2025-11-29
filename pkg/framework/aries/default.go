@@ -5,6 +5,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packager"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer/anoncrypt"
@@ -55,7 +56,19 @@ func defFrameworkOpts(aries *Aries) error {
 		return err
 	}
 
+	if aries.secretLock == nil && aries.kmsCreator == nil {
+		err = createDefSecretLock(aries)
+		if err != nil {
+			return err
+		}
+	}
+
 	return setAdditionalDefaultOpts(aries)
+}
+
+func createDefSecretLock(aries *Aries) error {
+	aries.secretLock = &noop.NoLock{}
+	return nil
 }
 
 func setAdditionalDefaultOpts(aries *Aries) error {

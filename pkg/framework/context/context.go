@@ -238,6 +238,13 @@ func WithStorageProvider(sp spistorage.Provider) ContextOption {
 	}
 }
 
+func WithProtocolStateStorageProvider(sp spistorage.Provider) ContextOption {
+	return func(p *Context) error {
+		p.protocolStateStoreProvider = sp
+		return nil
+	}
+}
+
 func WithJSONLDContextStore(store ldstore.ContextStore) ContextOption {
 	return func(p *Context) error {
 		p.contextStore = store

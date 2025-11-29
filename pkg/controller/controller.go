@@ -29,11 +29,11 @@ func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) 
 		opt(restAPIOpts)
 	}
 
-	kmscmd := kmsrest.New(ctx)
+	kmsRest := kmsrest.New(ctx)
 	// wallet := vcwalletrest.New(ctx)
 
 	var allHandlers []rest.Handler
-	allHandlers = append(allHandlers, kmscmd.GetRESTHandlers()...)
+	allHandlers = append(allHandlers, kmsRest.GetRESTHandlers()...)
 
 	return allHandlers, nil
 }
