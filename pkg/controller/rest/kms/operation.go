@@ -32,10 +32,25 @@ type Operation struct {
 	command  kmsCommand
 }
 
+// CreateKeySet swagger:route POST /kms/keyset kms createKeySet
+//
+// Create key set.
+//
+// Responses:
+//
+//	default: genericError
+//	    200: createKeySetRes
 func (o *Operation) CreateKeySet(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.CreatKeySet, rw, req.Body)
 }
 
+// ImportKey swagger:route POST /kms/import kms importKey
+//
+// Import key.
+//
+// Responses:
+//
+//	default: genericError
 func (o *Operation) ImportKey(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.ImportKey, rw, req.Body)
 }
