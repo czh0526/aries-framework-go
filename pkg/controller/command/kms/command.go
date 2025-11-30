@@ -8,6 +8,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
 	"github.com/czh0526/aries-framework-go/component/log"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command"
+	"github.com/czh0526/aries-framework-go/pkg/controller/internal/cmdutil"
 	"github.com/czh0526/aries-framework-go/pkg/internal/logutil"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"io"
@@ -40,7 +41,17 @@ type Command struct {
 	importKey func(privKey interface{}, kt spikms.KeyType, opts ...spikms.PrivateKeyOpts) (string, interface{}, error)
 }
 
-func (c *Command) CreatKeySet(rw io.Writer, req io.Reader) command.Error {
+func New(ctx provider) *Command {
+	return &Command{
+		ctx: ctx,
+		importKey: func(privKey interface{}, kt spikms.KeyType,
+			opts ...spikms.PrivateKeyOpts) (string, interface{}, error) {
+			return ctx.KMS().ImportPrivateKey(privKey, kt, opts...)
+		},
+	}
+}
+
+func (c *Command) CreateKeySet(rw io.Writer, req io.Reader) command.Error {
 	var request CreateKeySetRequest
 
 	err := json.NewDecoder(req).Decode(&request)
@@ -81,7 +92,7 @@ func (c *Command) ImportKey(rw io.Writer, req io.Reader) command.Error {
 	var j jwk.JWK
 	if errUnmarshal := json.Unmarshal(buf.Bytes(), &j); errUnmarshal != nil {
 		logutil.LogError(logger, CommandName, ImportKeyCommandMethod, errUnmarshal.Error())
-		return command.NewValidationError(InvalidRequestErrorCode, fmt.Errorf("failed request decode: %w", err))
+		return command.NewValidationError(InvalidRequestErrorCode, fmt.Errorf("failed request decode: %w", errUnmarshal))
 	}
 
 	if j.KeyID == "" {
@@ -118,12 +129,9 @@ func (c *Command) ImportKey(rw io.Writer, req io.Reader) command.Error {
 	return nil
 }
 
-func New(ctx provider) *Command {
-	return &Command{
-		ctx: ctx,
-		importKey: func(privKey interface{}, kt spikms.KeyType,
-			opts ...spikms.PrivateKeyOpts) (string, interface{}, error) {
-			return ctx.KMS().ImportPrivateKey(privKey, kt, opts...)
-		},
+func (c *Command) GetHandlers() []command.Handler {
+	return []command.Handler{
+		cmdutil.NewCommandHandler(CommandName, CreateKeySetCommandMethod, c.CreateKeySet),
+		cmdutil.NewCommandHandler(CommandName, ImportKeyCommandMethod, c.ImportKey),
 	}
 }

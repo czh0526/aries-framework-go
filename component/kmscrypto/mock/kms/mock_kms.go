@@ -1,7 +1,7 @@
 package kms
 
 import (
-	comp_kms "github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
@@ -112,7 +112,7 @@ func (p *Provider) SecretLock() spisecretlock.Service {
 
 func NewProviderForKMS(storeProvider spistorage.Provider, secretLock spisecretlock.Service) (*Provider, error) {
 	// 构建一个 kms store
-	kmsStore, err := comp_kms.NewAriesProviderWrapper(storeProvider)
+	kmsStore, err := kms.NewAriesProviderWrapper(storeProvider)
 	if err != nil {
 		return nil, err
 	}

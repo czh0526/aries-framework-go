@@ -3,9 +3,11 @@ module github.com/czh0526/aries-framework-go/cmd/aies-agent-rest
 go 1.23.9
 
 require (
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/czh0526/aries-framework-go v0.0.0-20251125104027-0553d3cc93aa
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef
-	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
+	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
+	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 	github.com/gorilla/mux v1.8.1
 	github.com/rs/cors v1.11.1
 	github.com/spf13/cobra v1.10.1
@@ -15,12 +17,10 @@ require (
 	github.com/IBM/mathlib v0.0.2 // indirect
 	github.com/btcsuite/btcd v0.22.3 // indirect
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.9.1 // indirect
-	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3 // indirect
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a // indirect
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a // indirect
-	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976 // indirect
 	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
@@ -49,6 +49,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace (
-	"github.com/czh0526/aries-framework-go" => "../../"
-)
+replace github.com/czh0526/aries-framework-go => ../../

@@ -185,14 +185,16 @@ func createStoreProviders(params *AgentParameters) (spistorage.Provider, error) 
 
 func createAriesAgent(params *AgentParameters) (*context.Context, error) {
 	var opts []aries.Option
-
+	// 构建 Store Provider
 	storePro, err := createStoreProviders(params)
 	if err != nil {
 		return nil, err
 	}
 
+	// 构建 Aries 参数
 	opts = append(opts, aries.WithStoreProvider(storePro))
 
+	// 构建 Aries
 	framework, err := aries.New(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create aries agent: %w", err)

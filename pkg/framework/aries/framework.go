@@ -124,18 +124,22 @@ func (a *Aries) closeVDR() error {
 }
 
 func initializeServices(aries *Aries) (*Aries, error) {
+	// 创建 KMS
 	if err := createKMS(aries); err != nil {
 		return nil, err
 	}
 
+	// 创建 VDR
 	if err := createVDR(aries); err != nil {
 		return nil, err
 	}
 
+	// 创建 Packer & Packager
 	if err := createPackersAndPackager(aries); err != nil {
 		return nil, err
 	}
 
+	// 创建 OutboundDispatcher
 	if err := createOutboundDispatcher(aries); err != nil {
 		return nil, err
 	}

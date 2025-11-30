@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/czh0526/aries-framework-go/pkg/controller/rest"
 	kmsrest "github.com/czh0526/aries-framework-go/pkg/controller/rest/kms"
+	vdrrest "github.com/czh0526/aries-framework-go/pkg/controller/rest/vdr"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	ldsvc "github.com/czh0526/aries-framework-go/pkg/ld"
 	"net/http"
@@ -29,11 +30,13 @@ func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) 
 		opt(restAPIOpts)
 	}
 
-	kmsRest := kmsrest.New(ctx)
+	vdrOp, err := vdrrest.New(ctx)
+
+	kmsOp := kmsrest.New(ctx)
 	// wallet := vcwalletrest.New(ctx)
 
 	var allHandlers []rest.Handler
-	allHandlers = append(allHandlers, kmsRest.GetRESTHandlers()...)
+	allHandlers = append(allHandlers, kmsOp.GetRESTHandlers()...)
 
 	return allHandlers, nil
 }

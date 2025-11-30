@@ -21,7 +21,7 @@ type provider interface {
 }
 
 type kmsCommand interface {
-	CreatKeySet(rw io.Writer, req io.Reader) command.Error
+	CreateKeySet(rw io.Writer, req io.Reader) command.Error
 	ImportKey(rw io.Writer, req io.Reader) command.Error
 }
 
@@ -41,7 +41,7 @@ type Operation struct {
 //	default: genericError
 //	    200: createKeySetRes
 func (o *Operation) CreateKeySet(rw http.ResponseWriter, req *http.Request) {
-	rest.Execute(o.command.CreatKeySet, rw, req.Body)
+	rest.Execute(o.command.CreateKeySet, rw, req.Body)
 }
 
 // ImportKey swagger:route POST /kms/import kms importKey

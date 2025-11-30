@@ -3,14 +3,14 @@ module github.com/czh0526/aries-framework-go
 go 1.23.9
 
 require (
-	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251123150327-e865d0a2866a
 	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3
-	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
+	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 )
 
 require (
@@ -54,4 +54,15 @@ require (
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
+)
+
+replace (
+	github.com/czh0526/aries-framework-go/component/kmscrypto => ./component/kmscrypto
+	github.com/czh0526/aries-framework-go/component/log => ./component/log
+	github.com/czh0526/aries-framework-go/component/models => ./component/models
+	github.com/czh0526/aries-framework-go/component/storage => ./component/storage
+	github.com/czh0526/aries-framework-go/component/storage/mysql => ./component/storage/mysql
+	github.com/czh0526/aries-framework-go/component/storageutil => ./component/storageutil
+	github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
+	github.com/czh0526/aries-framework-go/spi => ./spi
 )

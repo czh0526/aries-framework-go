@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"github.com/czh0526/aries-framework-go/pkg/controller/command"
 	"github.com/czh0526/aries-framework-go/pkg/controller/rest"
 	"net/http"
 )
@@ -30,5 +31,33 @@ func NewHTTPHandler(path, method string, handle http.HandlerFunc) *HTTPHandler {
 		path:   path,
 		method: method,
 		handle: handle,
+	}
+}
+
+type CommandHandler struct {
+	name   string
+	method string
+	handle command.Exec
+}
+
+func (c *CommandHandler) Name() string {
+	return c.name
+}
+
+func (c *CommandHandler) Method() string {
+	return c.method
+}
+
+func (c *CommandHandler) Handle() command.Exec {
+	return c.handle
+}
+
+var _ command.Handler = (*CommandHandler)(nil)
+
+func NewCommandHandler(name, method string, exec command.Exec) *CommandHandler {
+	return &CommandHandler{
+		name:   name,
+		method: method,
+		handle: exec,
 	}
 }

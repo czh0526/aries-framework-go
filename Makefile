@@ -15,6 +15,10 @@ gen-mock:
 	mockgen -destination pkg/internal/gomocks/didcomm/messenger/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/pkg/didcomm/messenger Provider
 	mockgen -destination pkg/internal/gomocks/didcomm/dispatcher/mocks.gen.go -self_package mocks -package mocks github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher Outbound
 
+
+gen-openapi-spec:
+	swagger generate spec -w cmd/aries-agent-rest -o build/rest/openapi/spec/openAPI.yml
+
 .PHONE: build
 build:
 	cd ./pkg/framework/aries
