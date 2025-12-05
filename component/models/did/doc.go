@@ -331,10 +331,42 @@ func contextWithBase(doc *Doc) Context {
 	return m
 }
 
+type rawDocResolution struct {
+	Context          Context         `json:"@context"`
+	DIDDocument      json.RawMessage `json:"didDocument,omitempty"`
+	DocumentMetadata json.RawMessage `json:"didDocumentMetadata,omitempty"`
+}
+
 type DocResolution struct {
 	Context          Context
 	DIDDocument      *Doc
 	DocumentMetadata *DocumentMetadata
+}
+
+func (docResolution *DocResolution) JSONBytes() ([]byte, error) {
+
+	didBytes, err := docResolution.DIDDocument.JSONBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	documentMetadataBytes, err := json.Marshal(docResolution.DocumentMetadata)
+	if err != nil {
+		return nil, err
+	}
+
+	raw := &rawDocResolution{
+		Context:          docResolution.Context,
+		DIDDocument:      didBytes,
+		DocumentMetadata: documentMetadataBytes,
+	}
+
+	byteDoc, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("JSON marshalling of document failed: %w", err)
+	}
+
+	return byteDoc, nil
 }
 
 func validate(data []byte, schemaLoader gojsonschema.JSONLoader) error {

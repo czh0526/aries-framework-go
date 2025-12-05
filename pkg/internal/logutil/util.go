@@ -1,6 +1,9 @@
 package logutil
 
-import spilog "github.com/czh0526/aries-framework-go/spi/log"
+import (
+	"fmt"
+	spilog "github.com/czh0526/aries-framework-go/spi/log"
+)
 
 func LogError(logger spilog.Logger, command, action, errMsg string, data ...string) {
 	logger.Errorf("command=[%s] action=[%s] %s errMsg=[%s]", command, action, data, errMsg)
@@ -12,4 +15,9 @@ func LogDebug(logger spilog.Logger, command, action, msg string, data ...string)
 
 func LogInfo(logger spilog.Logger, command, action, msg string, data ...string) {
 	logger.Infof("command=[%s] action=[%s] %s msg=[%s]", command, action, data, msg)
+}
+
+// CreateKeyValueString creates a concatenated string.
+func CreateKeyValueString(key, val string) string {
+	return fmt.Sprintf("%s=[%s]", key, val)
 }
