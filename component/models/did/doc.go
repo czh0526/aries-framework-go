@@ -51,6 +51,8 @@ var (
 	logger             = log.New("aries-framework/doc/did")
 )
 
+var ErrDIDDocumentNotExist = errors.New("did document not exists")
+
 type Context interface{}
 
 type processingMeta struct {
@@ -91,16 +93,24 @@ type rawDoc struct {
 	Proof                []interface{}            `json:"proof,omitempty"`
 }
 
-func (r *rawDoc) schemaLoader() gojsonschema.JSONLoader {
-	context, _ := ContextPeekString(r.Context)
-	switch context {
-	case contextV011:
-		return schemaLoaderV011
-	case contextV12019:
-		return schemaLoaderV12019
-	default:
-		return schemaLoaderV1
-	}
+type DocumentMetadata struct {
+	VersionID    string          `json:"versionId,omitempty"`
+	Deactivated  bool            `json:"deactivated,omitempty"`
+	CanonicalID  string          `json:"canonicalId,omitempty"`
+	EquivalentID []string        `json:"equivalentId,omitempty"`
+	Method       *MethodMetadata `json:"method,omitempty"`
+}
+
+type rawDocResolution struct {
+	Context          Context         `json:"@context"`
+	DIDDocument      json.RawMessage `json:"didDocument,omitempty"`
+	DocumentMetadata json.RawMessage `json:"didDocumentMetadata,omitempty"`
+}
+
+type DocResolution struct {
+	Context          Context
+	DIDDocument      *Doc
+	DocumentMetadata *DocumentMetadata
 }
 
 func ParseDocument(data []byte) (*Doc, error) {
@@ -165,6 +175,38 @@ func ParseDocument(data []byte) (*Doc, error) {
 
 	doc.Proof = proofs
 	return doc, nil
+}
+
+func ParseDocumentResolution(data []byte) (*DocResolution, error) {
+	raw := &rawDocResolution{}
+
+	if err := json.Unmarshal(data, raw); err != nil {
+		return nil, err
+	}
+
+	if len(raw.DIDDocument) == 0 {
+		return nil, ErrDIDDocumentNotExist
+	}
+
+	doc, err := ParseDocument(raw.DIDDocument)
+	if err != nil {
+		return nil, err
+	}
+
+	docMeta := &DocumentMetadata{}
+	if len(raw.DocumentMetadata) > 0 {
+		if err := json.Unmarshal(raw.DocumentMetadata, docMeta); err != nil {
+			return nil, err
+		}
+	}
+
+	context, _ := parseContext(raw.Context)
+
+	return &DocResolution{
+		Context:          context,
+		DIDDocument:      doc,
+		DocumentMetadata: docMeta,
+	}, nil
 }
 
 func (doc *Doc) JSONBytes() ([]byte, error) {
@@ -237,6 +279,44 @@ func (doc *Doc) JSONBytes() ([]byte, error) {
 	}
 
 	return byteDoc, nil
+}
+
+func (docResolution *DocResolution) JSONBytes() ([]byte, error) {
+
+	didBytes, err := docResolution.DIDDocument.JSONBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	documentMetadataBytes, err := json.Marshal(docResolution.DocumentMetadata)
+	if err != nil {
+		return nil, err
+	}
+
+	raw := &rawDocResolution{
+		Context:          docResolution.Context,
+		DIDDocument:      didBytes,
+		DocumentMetadata: documentMetadataBytes,
+	}
+
+	byteDoc, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("JSON marshalling of document failed: %w", err)
+	}
+
+	return byteDoc, nil
+}
+
+func (r *rawDoc) schemaLoader() gojsonschema.JSONLoader {
+	context, _ := ContextPeekString(r.Context)
+	switch context {
+	case contextV011:
+		return schemaLoaderV011
+	case contextV12019:
+		return schemaLoaderV12019
+	default:
+		return schemaLoaderV1
+	}
 }
 
 func populateRawAlsoKnownAs(aka []string) []interface{} {
@@ -330,45 +410,6 @@ func contextWithBase(doc *Doc) Context {
 
 	return m
 }
-
-type rawDocResolution struct {
-	Context          Context         `json:"@context"`
-	DIDDocument      json.RawMessage `json:"didDocument,omitempty"`
-	DocumentMetadata json.RawMessage `json:"didDocumentMetadata,omitempty"`
-}
-
-type DocResolution struct {
-	Context          Context
-	DIDDocument      *Doc
-	DocumentMetadata *DocumentMetadata
-}
-
-func (docResolution *DocResolution) JSONBytes() ([]byte, error) {
-
-	didBytes, err := docResolution.DIDDocument.JSONBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	documentMetadataBytes, err := json.Marshal(docResolution.DocumentMetadata)
-	if err != nil {
-		return nil, err
-	}
-
-	raw := &rawDocResolution{
-		Context:          docResolution.Context,
-		DIDDocument:      didBytes,
-		DocumentMetadata: documentMetadataBytes,
-	}
-
-	byteDoc, err := json.Marshal(raw)
-	if err != nil {
-		return nil, fmt.Errorf("JSON marshalling of document failed: %w", err)
-	}
-
-	return byteDoc, nil
-}
-
 func validate(data []byte, schemaLoader gojsonschema.JSONLoader) error {
 	documentLoader := gojsonschema.NewStringLoader(string(data))
 

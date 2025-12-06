@@ -34,11 +34,3 @@ type MethodMetadata struct {
 	// PublishedOperations published operations
 	PublishedOperations []*ProtocolOperation `json:"publishedOperations,omitempty"`
 }
-
-type DocumentMetadata struct {
-	VersionID    string          `json:"versionId,omitempty"`
-	Deactivated  bool            `json:"deactivated,omitempty"`
-	CanonicalID  string          `json:"canonicalId,omitempty"`
-	EquivalentID []string        `json:"equivalentId,omitempty"`
-	Method       *MethodMetadata `json:"method,omitempty"`
-}
