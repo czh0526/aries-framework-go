@@ -5,8 +5,11 @@ go 1.23.9
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/czh0526/aries-framework-go v0.0.0-20251206042806-4eaf6ce264e2
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a // indirect
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef
+	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7 // indirect
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
+	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3 // indirect
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 	github.com/gorilla/mux v1.8.1
 	github.com/rs/cors v1.11.1
@@ -19,9 +22,6 @@ require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.9.1 // indirect
-	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a // indirect
-	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a // indirect
-	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251123140137-a11a60fb08e3 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect

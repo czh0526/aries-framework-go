@@ -9,13 +9,13 @@ require (
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251123150327-e865d0a2866a
+	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251206042806-4eaf6ce264e2
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 )
 
 require (
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-00010101000000-000000000000
 	github.com/go-jose/go-jose v2.6.3+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang/mock v1.6.0
@@ -54,15 +54,4 @@ require (
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
-)
-
-replace (
-	github.com/czh0526/aries-framework-go/component/kmscrypto => ./component/kmscrypto
-	github.com/czh0526/aries-framework-go/component/log => ./component/log
-	github.com/czh0526/aries-framework-go/component/models => ./component/models
-	github.com/czh0526/aries-framework-go/component/storage => ./component/storage
-	github.com/czh0526/aries-framework-go/component/storage/mysql => ./component/storage/mysql
-	github.com/czh0526/aries-framework-go/component/storageutil => ./component/storageutil
-	github.com/czh0526/aries-framework-go/component/vdr => ./component/vdr
-	github.com/czh0526/aries-framework-go/spi => ./spi
 )

@@ -31,11 +31,15 @@ func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) 
 	}
 
 	vdrOp, err := vdrrest.New(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	kmsOp := kmsrest.New(ctx)
 	// wallet := vcwalletrest.New(ctx)
 
 	var allHandlers []rest.Handler
+	allHandlers = append(allHandlers, vdrOp.GetRESTHandlers()...)
 	allHandlers = append(allHandlers, kmsOp.GetRESTHandlers()...)
 
 	return allHandlers, nil

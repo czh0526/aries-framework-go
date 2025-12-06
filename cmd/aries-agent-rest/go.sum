@@ -30,6 +30,8 @@ github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef/go.mod h1:aPR3AYkObR8BE84gxnP4NvgzH5esfchGcWqeEif8DIU=
 github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a h1:XUiMtdrPPNrzjKlPFFfGV3D9bVZI74V0mHsptFCbgVc=
 github.com/czh0526/aries-framework-go/component/models v0.0.0-20251123150327-e865d0a2866a/go.mod h1:STU7NeYzbjxKjF2wP/r+DT76Y0N5EH0Rs6v6hkiemnU=
+github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7 h1:xBVWDHK+By85HoHBV79bFY+m91Es9cVto61gcIH9GDE=
+github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7/go.mod h1:sSFhoh5BlpDLywvBeCd8wUAfPArOuHNrOLIsUJnN1kk=
 github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd h1:uJmvr9mkzFb6uJCKauHz+ZGShj8UTsFBjui/6ZkxCo8=
 github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd/go.mod h1:h+8B5xXdnmub6zWWcVDaaYGqWhMzPhQE/W0XCyoNkqA=
 github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976 h1:OnOGj4JLEIctaLZRX9F42rI4xNcbf+Teb8mU+73bCWc=
