@@ -26,6 +26,8 @@ github.com/czh0526/aries-framework-go v0.0.0-20251206070216-b4c34d9cb8c8 h1:Dnc9
 github.com/czh0526/aries-framework-go v0.0.0-20251206070216-b4c34d9cb8c8/go.mod h1:TJWz9ZtQtbKVY9SiyXh3QTMtVlK1J8sOyOn2VD78KJY=
 github.com/czh0526/aries-framework-go v0.0.0-20251206071244-24f242821fd9 h1:r4kq6rrMm29b9v7nGZgRD8fb6O6Rri02oMdeEQY9hMw=
 github.com/czh0526/aries-framework-go v0.0.0-20251206071244-24f242821fd9/go.mod h1:TJWz9ZtQtbKVY9SiyXh3QTMtVlK1J8sOyOn2VD78KJY=
+github.com/czh0526/aries-framework-go v0.0.0-20251206080044-d6a0a21d4e73 h1:HUftu75ZnFiD/tXP5ieLaT3emUFBViA3/Wl1llDayy4=
+github.com/czh0526/aries-framework-go v0.0.0-20251206080044-d6a0a21d4e73/go.mod h1:TJWz9ZtQtbKVY9SiyXh3QTMtVlK1J8sOyOn2VD78KJY=
 github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a h1:yuwqeAXqTTAF47c4UjGuifk2t0wHDntr2B7a2HQPR4Q=
 github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a/go.mod h1:uz3JDrhofy0ctTnzardPztdpIpJHoynC/PQz8x0MkyQ=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef h1:dN7EmPzpXrGw2sg5BTsjTHw6JYVfhXr6CD2m4xYqICM=

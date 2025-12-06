@@ -55,22 +55,61 @@ func (o *Operation) registerHandler() {
 	}
 }
 
+// CreateDID swagger:route POST /vdr/did/create vdr createDIDReq
+//
+// Create a did document.
+//
+// Responses:
+//
+//	default: genericError
+//	    200: documentRes
 func (o *Operation) CreateDID(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.CreateDID, rw, req.Body)
 }
 
+// ResolveDID swagger:route GET /vdr/did/resolve/{id} vdr resolveDIDReq
+//
+// # Resolve did
+//
+// Responses:
+//
+//	default: genericError
+//	    200: resolveDIDRes
 func (o *Operation) ResolveDID(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.ResolveDID, rw, req.Body)
 }
 
+// SaveDID swagger:route POST /vdr/did vdr saveDIDReq
+//
+// Saves a did document with the friendly name.
+//
+// Responses:
+//
+//	default: genericError
 func (o *Operation) SaveDID(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.SaveDID, rw, req.Body)
 }
 
+// GetDIDRecords swagger:route GET /vdr/did/records vdr getDIDRecords
+//
+// # Retrieves the did records
+//
+// Responses:
+//
+//	default: genericError
+//	    200: didRecordResult
 func (o *Operation) GetDIDRecords(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.GetDIDRecords, rw, req.Body)
 }
 
+// GetDID swagger:route GET /vdr/did/{id} vdr getDIDReq
+//
+// Gets did document with the friendly name.
+//
+// Responses:
+//
+//	default: genericError
+//	    200: documentRes
 func (o *Operation) GetDID(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.GetDID, rw, req.Body)
 }
