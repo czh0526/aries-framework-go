@@ -203,9 +203,23 @@ func New(opts ...ContextOption) (*Context, error) {
 	return &provider, nil
 }
 
+func WithStorageProvider(sp spistorage.Provider) ContextOption {
+	return func(p *Context) error {
+		p.storeProvider = sp
+		return nil
+	}
+}
+
 func WithKMS(k spikms.KeyManager) ContextOption {
 	return func(p *Context) error {
 		p.kms = k
+		return nil
+	}
+}
+
+func WithSecretLock(lock spisecretlock.Service) ContextOption {
+	return func(ctx *Context) error {
+		ctx.secretLock = lock
 		return nil
 	}
 }
@@ -227,13 +241,6 @@ func WithOutboundTransports(transports ...transport.OutboundTransport) ContextOp
 func WithPackager(packager transport.Packager) ContextOption {
 	return func(opts *Context) error {
 		opts.packager = packager
-		return nil
-	}
-}
-
-func WithStorageProvider(sp spistorage.Provider) ContextOption {
-	return func(p *Context) error {
-		p.storeProvider = sp
 		return nil
 	}
 }

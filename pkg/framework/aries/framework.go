@@ -92,8 +92,10 @@ func New(opts ...Option) (*Aries, error) {
 
 func (a *Aries) Context() (*context.Context, error) {
 	return context.New(
+		context.WithCrypto(a.crypto),
+		context.WithStorageProvider(a.storeProvider),
 		context.WithKMS(a.kms),
-		context.WithCrypto(a.crypto))
+		context.WithSecretLock(a.secretLock))
 }
 
 func (a *Aries) Close() error {
