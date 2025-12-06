@@ -4,7 +4,7 @@ go 1.23.9
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/czh0526/aries-framework-go v0.0.0-20251125104027-0553d3cc93aa
+	github.com/czh0526/aries-framework-go v0.0.0-00010101000000-000000000000
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976

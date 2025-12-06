@@ -143,6 +143,11 @@ func (o *Command) ResolveDID(rw io.Writer, req io.Reader) command.Error {
 	}
 
 	docBytes, err := doc.JSONBytes()
+	if err != nil {
+		logutil.LogError(logger, CommandName, ResolveDIDCommandMethod, "marshal did doc resolution response: "+err.Error(),
+			logutil.CreateKeyValueString(didID, request.ID))
+		return command.NewValidationError(ResolveDIDErrorCode, fmt.Errorf("marshal did doc resolution response: %w", err))
+	}
 
 	_, err = rw.Write(docBytes)
 	if err != nil {
