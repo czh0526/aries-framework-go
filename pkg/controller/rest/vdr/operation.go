@@ -75,6 +75,6 @@ func (o *Operation) GetDID(rw http.ResponseWriter, req *http.Request) {
 	rest.Execute(o.command.GetDID, rw, req.Body)
 }
 
-func (o *Operation) GetRESETHandlers() []rest.Handler {
+func (o *Operation) GetRESTHandlers() []rest.Handler {
 	return o.handlers
 }
