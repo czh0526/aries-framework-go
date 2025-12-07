@@ -47,6 +47,42 @@ func NewVerificationMethodFromJWK(id, keyType, controller string, j *jwk.JWK) (*
 	}, nil
 }
 
+func NewVerificationMethodFromBytes(id, keyType, controller string, value []byte) *VerificationMethod {
+	relativeURL := false
+	if strings.HasPrefix(id, "#") {
+		relativeURL = true
+	}
+
+	if keyType == "Ed25519VerificationKey2020" {
+		return NewVerificationMethodFromBytesWithMultibase(id, keyType, controller, value, multibase.Base58BTC)
+	}
+
+	return &VerificationMethod{
+		ID:          id,
+		Type:        keyType,
+		Controller:  controller,
+		Value:       value,
+		relativeURL: relativeURL,
+	}
+}
+
+func NewVerificationMethodFromBytesWithMultibase(id, keyType, controller string, value []byte,
+	encoding multibase.Encoding) *VerificationMethod {
+	relativeURL := false
+	if strings.HasPrefix(id, "#") {
+		relativeURL = true
+	}
+
+	return &VerificationMethod{
+		ID:                id,
+		Type:              keyType,
+		Controller:        controller,
+		Value:             value,
+		relativeURL:       relativeURL,
+		multibaseEncoding: encoding,
+	}
+}
+
 func populateRawVM(context, didID, baseURI string, pks []VerificationMethod) ([]map[string]interface{}, error) {
 	var rawVM []map[string]interface{}
 

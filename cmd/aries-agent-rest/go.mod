@@ -4,11 +4,11 @@ go 1.23.9
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/czh0526/aries-framework-go v0.0.0-20251206080044-d6a0a21d4e73
-	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a // indirect
+	github.com/czh0526/aries-framework-go v0.0.0-20251206080851-04becc173c3c
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251123145832-5f9067fd8bef
-	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7 // indirect
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
+	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7 // indirect
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a // indirect
 	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251206042806-4eaf6ce264e2 // indirect
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 	github.com/gorilla/mux v1.8.1
@@ -47,4 +47,15 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
+)
+
+replace (
+	"github.com/czh0526/aries-framework-go" => ../../
+	"github.com/czh0526/aries-framework-go/component/kmscrypto" => ../../component/kmscrypto
+	"github.com/czh0526/aries-framework-go/component/log" => ../../component/log
+    "github.com/czh0526/aries-framework-go/component/storage/mysql" => ../../component/storage/mysql
+    "github.com/czh0526/aries-framework-go/spi" => ../../spi
+    "github.com/czh0526/aries-framework-go/component/models" => ../../component/models
+   	"github.com/czh0526/aries-framework-go/component/kmscrypto" => ../../component/kmscrypto
+    "github.com/czh0526/aries-framework-go/component/vdr" => ../../component/vdr
 )

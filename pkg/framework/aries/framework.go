@@ -95,7 +95,8 @@ func (a *Aries) Context() (*context.Context, error) {
 		context.WithCrypto(a.crypto),
 		context.WithStorageProvider(a.storeProvider),
 		context.WithKMS(a.kms),
-		context.WithSecretLock(a.secretLock))
+		context.WithSecretLock(a.secretLock),
+		context.WithVDRegistry(a.vdrRegistry))
 }
 
 func (a *Aries) Close() error {

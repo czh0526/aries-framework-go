@@ -22,6 +22,21 @@ type Verification struct {
 	Embedded           bool
 }
 
+func NewEmbeddedVerification(vm *VerificationMethod, r VerificationRelationship) *Verification {
+	return &Verification{
+		VerificationMethod: *vm,
+		Relationship:       r,
+		Embedded:           true,
+	}
+}
+
+func NewReferencedVerification(vm *VerificationMethod, r VerificationRelationship) *Verification {
+	return &Verification{
+		VerificationMethod: *vm,
+		Relationship:       r,
+	}
+}
+
 func populateRawVerification(context, baseURI, didID string, verifications []Verification) ([]interface{}, error) {
 	var rawVerifications []interface{}
 

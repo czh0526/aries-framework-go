@@ -30,8 +30,7 @@ func (V VDR) Create(did *did.Doc, opts ...vdr.DIDMethodOption) (*did.DocResoluti
 }
 
 func (V VDR) Accept(method string, opts ...vdr.DIDMethodOption) bool {
-	//TODO implement me
-	panic("implement me")
+	return method == DIDMethod
 }
 
 func (V VDR) Update(did *did.Doc, opts ...vdr.DIDMethodOption) error {
