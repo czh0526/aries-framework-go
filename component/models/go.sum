@@ -23,7 +23,8 @@ github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-
 github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:uz3JDrhofy0ctTnzardPztdpIpJHoynC/PQz8x0MkyQ=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789 h1:ipTJbK7ohvX1B5J8bSZ7659tlH7Z5BW2ezG8zILpUzI=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789/go.mod h1:2YjcrX4BqVSy3Sq92jd93SlQWh6c8tEJp1uVuItwGdg=
-github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=
+github.com/czh0526/aries-framework-go/spi v0.0.0-20251123140137-a11a60fb08e3 h1:KGQ5o2RgMl5tihZMxrfWFlAnNDTYPrNjgqWlElZ9a4c=
+github.com/czh0526/aries-framework-go/spi v0.0.0-20251123140137-a11a60fb08e3/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
