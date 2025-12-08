@@ -2,6 +2,8 @@ package verifiable
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
 	signatureapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
@@ -10,6 +12,23 @@ import (
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/xeipuuv/gojsonschema"
 	"net/http"
+	"strings"
+)
+
+type vcModelValidationMode int
+
+const (
+	combinedValidation vcModelValidationMode = iota
+	jsonldValidation
+	baseContextValidation
+	baseContextExtendedValidation
+)
+
+const (
+	schemaPropertyType              = "type"
+	schemaPropertyCredentialSubject = "credentialSubject"
+	schemaPropertyIssuer            = "issuer"
+	schemaPropertyIssuanceDate      = "issuanceDate"
 )
 
 type Issuer struct {
@@ -89,7 +108,315 @@ func (rc *rawCredential) UnmarshalJSON(data []byte) error {
 }
 
 func ParseCredential(vcData []byte, opts ...CredentialOpt) (*Credential, error) {
-	
+	vcOpts := getCredentialOpts(opts)
+
+	vcStr := unwrapStringVC(vcData)
+
+	var (
+		vcDataDecoded []byte
+		externalJWT   string
+		err           error
+		isJWT         bool
+		disclosures   []string
+		holderBinding string
+		sdJWTVersion  common.SDJWTVersion
+	)
+
+	isJWT, vcStr, disclosures, holderBinding := isJWTVC(vcStr)
+}
+
+func getCredentialOpts(opts []CredentialOpt) *credentialOpts {
+	crOpts := &credentialOpts{
+		modelValidationMode: combinedValidation,
+		verifyDataIntegrity: &verifyDataIntegrityOpts{},
+	}
+
+	for _, opt := range opts {
+		opt(crOpts)
+	}
+
+	if crOpts.schemaLoader == nil {
+		crOpts.schemaLoader = newDefaultSchemaLoader()
+	}
+
+	return crOpts
+}
+
+type externalJWTVC struct {
+	JWT string `json:"jwt,omitempty"`
+}
+
+func unQuote(s []byte) []byte {
+	if len(s) <= 1 {
+		return s
+	}
+
+	if s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+
+	return s
+}
+
+func unwrapStringVC(vcData []byte) string {
+	vcStr := string(unQuote(vcData))
+
+	jwtHolder := &externalJWTVC{}
+	e := json.Unmarshal(vcData, jwtHolder)
+
+	hasJWT := e == nil && jwtHolder.JWT != ""
+	if hasJWT {
+		vcStr = jwtHolder.JWT
+	}
+
+	return vcStr
+}
+
+func newDefaultSchemaLoader() *CredentialSchemaLoader {
+	return &CredentialSchemaLoader{
+		schemaDownloadClient: &http.Client{},
+		jsonLoader:           defaultSchemaLoader(),
+	}
+}
+
+func defaultSchemaLoader() gojsonschema.JSONLoader {
+	return gojsonschema.NewStringLoader(JSONSchemaLoader())
+}
+
+type schemaOpts struct {
+	disableChecks []string
+}
+
+type SchemaOpt func(*schemaOpts)
+
+func WithDisableRequiredField(fieldName string) SchemaOpt {
+	return func(opts *schemaOpts) {
+		opts.disableChecks = append(opts.disableChecks, fieldName)
+	}
+}
+
+// DefaultSchemaTemplate describes default schema.
+const DefaultSchemaTemplate = `{
+  "required": [
+    "@context"
+    %s    
+  ],
+  "properties": {
+    "@context": {
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "https://www.w3.org/2018/credentials/v1"
+        },
+        {
+          "type": "array",
+          "items": [
+            {
+              "type": "string",
+              "const": "https://www.w3.org/2018/credentials/v1"
+            }
+          ],
+          "uniqueItems": true,
+          "additionalItems": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "id": {
+      "type": "string"
+    },
+    "type": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "contains": {
+            "type": "string",
+            "pattern": "^VerifiableCredential$"
+          }
+        },
+        {
+          "type": "string",
+          "pattern": "^VerifiableCredential$"
+        }
+      ]
+    },
+    "credentialSubject": {
+      "anyOf": [
+        {
+          "type": "array"
+        },
+        {
+          "type": "object"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "issuer": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      ]
+    },
+    "issuanceDate": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "proof": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/proof"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/proof"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expirationDate": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "credentialStatus": {
+      "$ref": "#/definitions/typedID"
+    },
+    "credentialSchema": {
+      "$ref": "#/definitions/typedIDs"
+    },
+    "evidence": {
+      "$ref": "#/definitions/typedIDs"
+    },
+    "refreshService": {
+      "$ref": "#/definitions/typedID"
+    }
+  },
+  "definitions": {
+    "typedID": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "type"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uri"
+            },
+            "type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "typedIDs": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/typedID"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/typedID"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proof": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+`
+
+func JSONSchemaLoader(opts ...SchemaOpt) string {
+	defaultRequired := []string{
+		schemaPropertyType,
+		schemaPropertyCredentialSubject,
+		schemaPropertyIssuer,
+		schemaPropertyIssuanceDate,
+	}
+
+	dsOpts := &schemaOpts{}
+	for _, opt := range opts {
+		opt(dsOpts)
+	}
+
+	required := ""
+	for _, prop := range defaultRequired {
+		filterOut := false
+
+		for _, d := range dsOpts.disableChecks {
+			if prop == d {
+				filterOut = true
+				break
+			}
+		}
+
+		if !filterOut {
+			required += fmt.Sprintf(" ,%q", prop)
+		}
+	}
+
+	return fmt.Sprintf(DefaultSchemaTemplate, required)
 }
 
 type credentialOpts struct {
@@ -120,8 +447,6 @@ type SchemaCache interface {
 	Get(k string) ([]byte, bool)
 }
 
-type vcModelValidationMode int
-
 type jsonldCredentialOpts struct {
 	jsonldDocumentLoader jsonld.DocumentLoader
 	externalContext      []string
@@ -133,5 +458,26 @@ type CredentialOpt func(opts *credentialOpts)
 func WithJSONLDDocumentLoader(documentLoader jsonld.DocumentLoader) CredentialOpt {
 	return func(opts *credentialOpts) {
 		opts.jsonldDocumentLoader = documentLoader
+	}
+}
+
+func isJWTVC(vcStr string) (bool, string, []string, string) {
+	var (
+		disclosures   []string
+		holderBinding string
+	)
+
+	tmpVCStr := vcStr
+	if strings.Contains(tmpVCStr, common.CombinedFormatSeparator) {
+		sdTokens := strings.Split(vcStr, common.CombinedFormatSeparator)
+		lastElem := sdTokens[len(sdTokens)-1]
+
+		isPresentation := lastElem == "" || jwt.IsJWS(lastElem)
+		if isPresentation {
+
+		} else {
+			cffi := common.ParseCombinedFormatForIssuance(vcStr)
+			disclosures = cffi.Dis
+		}
 	}
 }
