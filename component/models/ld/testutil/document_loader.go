@@ -2,6 +2,7 @@ package testutil
 
 import (
 	_ "embed"
+	"fmt"
 	ldcontext "github.com/czh0526/aries-framework-go/component/models/ld/context"
 	"github.com/czh0526/aries-framework-go/component/models/ld/documentloader"
 	mockldstore "github.com/czh0526/aries-framework-go/component/models/ld/mock"
@@ -67,10 +68,26 @@ type mockProvider struct {
 	RemoteProviderStore ldstore.RemoteProviderStore
 }
 
+func (m *mockProvider) JSONLDContextStore() ldstore.ContextStore {
+	return m.ContextStore
+}
+
+func (m *mockProvider) JSONLDRemoteProviderStore() ldstore.RemoteProviderStore {
+	return m.RemoteProviderStore
+}
+
 func createTestDocumentLoader(extraContexts ...ldcontext.Document) (*documentloader.DocumentLoader, error) {
 	contexts := append(testContexts, extraContexts...)
 
 	p := &mockProvider{
-		ContextStore: mockldstore.NewMockContextStore(),
+		ContextStore:        mockldstore.NewMockContextStore(),
+		RemoteProviderStore: mockldstore.NewMockRemoteProviderStore(),
 	}
+
+	loader, err := documentloader.NewDocumentLoader(p, documentloader.WithExtraContexts(contexts...))
+	if err != nil {
+		return nil, fmt.Errorf("create document loader: %w", err)
+	}
+
+	return loader, nil
 }

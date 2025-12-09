@@ -7,7 +7,8 @@ require (
 	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251208043106-351c7e6daee0
-	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123140137-a11a60fb08e3
+	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
+	github.com/google/uuid v1.6.0
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/piprate/json-gold v0.5.0
 	github.com/stretchr/testify v1.10.0
@@ -40,4 +41,7 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/czh0526/aries-framework-go/component/storageutil => ../storageutil
+replace (
+	github.com/czh0526/aries-framework-go/component/kmscrypto => ../kmscrypto
+	github.com/czh0526/aries-framework-go/component/storageutil => ../storageutil
+)

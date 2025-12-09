@@ -13,7 +13,7 @@ const (
 )
 
 type ContextStore interface {
-	Get(u string) (jsonld.RemoteDocument, error)
+	Get(u string) (*jsonld.RemoteDocument, error)
 	Put(u string, rd *jsonld.RemoteDocument) error
 	Import(documents []ldcontext.Document) error
 	Delete(documents []ldcontext.Document) error

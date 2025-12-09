@@ -15,6 +15,13 @@ const (
 	jwsSignaturePart = 2
 )
 
+type SignatureVerifier interface {
+	Verify(joseHeaders Headers, payload, signingInput, signature []byte) error
+}
+
+var _ SignatureVerifier = (DefaultSigningInputVerifier)(nil)
+var _ SignatureVerifier = (SignatureVerifierFunc)(nil)
+
 type DefaultSigningInputVerifier func(
 	joseHeaders Headers,
 	payload, signingInput, signature []byte) error
@@ -26,6 +33,23 @@ func (s DefaultSigningInputVerifier) Verify(joseHeaders Headers, payload, _, sig
 	}
 
 	return s(joseHeaders, payload, signingInputData, signature)
+}
+
+type SignatureVerifierFunc func(joseHeaders Headers, payload, signingInput, signature []byte) error
+
+func (s SignatureVerifierFunc) Verify(joseHeaders Headers, payload, signingInput, signature []byte) error {
+	return s(joseHeaders, payload, signingInput, signature)
+}
+
+type CompositeAlgSigVerifier struct {
+	verifierByAlg map[string]SignatureVerifier
+}
+
+func (v *CompositeAlgSigVerifier) Verify(joseHeaders Headers)
+
+type AlgSignatureVerifier struct {
+	Alg      string
+	Verifier SignatureVerifier
 }
 
 type JSONWebSignature struct {
@@ -66,16 +90,6 @@ func (s JSONWebSignature) SerializeCompact(detached bool) (string, error) {
 		b64Headers, b64Payload, b64Signature), nil
 }
 
-type SignatureVerifier interface {
-	Verify(joseHeaders Headers, payload, signingInput, signature []byte) error
-}
-
-type SignatureVerifierFunc func(joseHeaders Headers, payload, signingInput, signature []byte) error
-
-func (s SignatureVerifierFunc) Verify(joseHeaders Headers, payload, signingInput, signature []byte) error {
-	return s(joseHeaders, payload, signingInput, signature)
-}
-
 type jwsParseOpts struct {
 	detachedPayload []byte
 }
@@ -88,6 +102,8 @@ type Signer interface {
 	Headers() Headers
 }
 
+// NewJWS 构建一个包含了 headers + payload 的 JWS 对象
+// 对 JWS 对象进行签名，并将签名放入 JWS 对象中
 func NewJWS(protectedHeaders, unprotectedHeaders Headers, payload []byte, signer Signer) (*JSONWebSignature, error) {
 	headers := mergeHeaders(protectedHeaders, signer.Headers())
 	jws := &JSONWebSignature{

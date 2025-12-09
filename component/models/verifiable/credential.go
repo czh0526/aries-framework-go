@@ -2,7 +2,9 @@ package verifiable
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
@@ -123,6 +125,11 @@ func ParseCredential(vcData []byte, opts ...CredentialOpt) (*Credential, error) 
 	)
 
 	isJWT, vcStr, disclosures, holderBinding := isJWTVC(vcStr)
+	if isJWT {
+		_, vcDataDecoded, err = decodeJWTVC(vcStr, vcOpts)
+	} else {
+		vcDataDecoded, err = decodeLDVC(vcData, vcStr, vcOpts)
+	}
 }
 
 func getCredentialOpts(opts []CredentialOpt) *credentialOpts {
@@ -474,10 +481,36 @@ func isJWTVC(vcStr string) (bool, string, []string, string) {
 
 		isPresentation := lastElem == "" || jwt.IsJWS(lastElem)
 		if isPresentation {
+			cffp := common.ParseCombinedFormatForPresentation(vcStr)
+
+			disclosures = cffp.Disclosures
+			tmpVCStr = cffp.SDJWT
+			holderBinding = cffp.HolderVerification
 
 		} else {
 			cffi := common.ParseCombinedFormatForIssuance(vcStr)
-			disclosures = cffi.Dis
+
+			disclosures = cffi.Disclosures
+			tmpVCStr = cffi.SDJWT
 		}
 	}
+
+	if jwt.IsJWS(tmpVCStr) {
+		return true, tmpVCStr, disclosures, holderBinding
+	}
+
+	return false, vcStr, nil, ""
+}
+
+func decodeJWTVC(vcStr string, vcOpts *credentialOpts) (jose.Headers, []byte, error) {
+	if vcOpts.publicKeyFetcher == nil && !vcOpts.disableProofCheck {
+		return nil, nil, errors.New("public key fetcher is not defined")
+	}
+
+	joseHeaders, vcDecodedBytes, err := decodeCredJWS(vcStr, !vcOpts.disableProofCheck, vcOpts.publicKeyFetcher)
+	if err != nil {
+		return nil, nil, fmt.Errorf("JWS decoding: %w", err)
+	}
+
+	return joseHeaders, vcDecodedBytes, nil
 }
