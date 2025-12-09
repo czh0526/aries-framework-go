@@ -21,6 +21,7 @@ type SignatureVerifier interface {
 
 var _ SignatureVerifier = (DefaultSigningInputVerifier)(nil)
 var _ SignatureVerifier = (SignatureVerifierFunc)(nil)
+var _ SignatureVerifier = (*CompositeAlgSigVerifier)(nil)
 
 type DefaultSigningInputVerifier func(
 	joseHeaders Headers,
@@ -35,7 +36,9 @@ func (s DefaultSigningInputVerifier) Verify(joseHeaders Headers, payload, _, sig
 	return s(joseHeaders, payload, signingInputData, signature)
 }
 
-type SignatureVerifierFunc func(joseHeaders Headers, payload, signingInput, signature []byte) error
+type SignatureVerifierFunc func(
+	joseHeaders Headers,
+	payload, signingInput, signature []byte) error
 
 func (s SignatureVerifierFunc) Verify(joseHeaders Headers, payload, signingInput, signature []byte) error {
 	return s(joseHeaders, payload, signingInput, signature)
@@ -45,11 +48,36 @@ type CompositeAlgSigVerifier struct {
 	verifierByAlg map[string]SignatureVerifier
 }
 
-func (v *CompositeAlgSigVerifier) Verify(joseHeaders Headers)
+func (v *CompositeAlgSigVerifier) Verify(joseHeaders Headers, payload, signingInput, signature []byte) error {
+	alg, ok := joseHeaders.Algorithm()
+	if !ok {
+		return errors.New("`alg` JOSE header is not present")
+	}
+
+	verifier, ok := v.verifierByAlg[alg]
+	if !ok {
+		return fmt.Errorf("no verifier found for %s algorithm", alg)
+	}
+
+	return verifier.Verify(joseHeaders, payload, signingInput, signature)
+}
 
 type AlgSignatureVerifier struct {
 	Alg      string
 	Verifier SignatureVerifier
+}
+
+func NewCompositeAlgSigVerifier(v AlgSignatureVerifier, vOther ...AlgSignatureVerifier) *CompositeAlgSigVerifier {
+	verifierByAlg := make(map[string]SignatureVerifier, 1+len(vOther))
+	verifierByAlg[v.Alg] = v.Verifier
+
+	for _, v := range vOther {
+		verifierByAlg[v.Alg] = v.Verifier
+	}
+
+	return &CompositeAlgSigVerifier{
+		verifierByAlg: verifierByAlg,
+	}
 }
 
 type JSONWebSignature struct {
