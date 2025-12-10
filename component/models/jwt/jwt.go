@@ -17,6 +17,32 @@ const (
 	AlgorithmNone = "none"
 )
 
+type parseOpts struct {
+	detachedPayload         []byte
+	sigVerifier             jose.SignatureVerifier
+	ignoreClaimsMapDecoding bool
+}
+
+type ParseOpt func(opts *parseOpts)
+
+func WithJWTDetachedPayload(payload []byte) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.detachedPayload = payload
+	}
+}
+
+func WithIgnoreClaimsMapDecoding(ignoreClaimsMapDecoding bool) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.ignoreClaimsMapDecoding = ignoreClaimsMapDecoding
+	}
+}
+
+func WithSignatureVerifier(signatureVerifier jose.SignatureVerifier) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.sigVerifier = signatureVerifier
+	}
+}
+
 type JSONWebToken struct {
 	Headers jose.Headers
 	Payload map[string]interface{}
@@ -128,4 +154,99 @@ func PayloadToMap(i interface{}) (map[string]interface{}, error) {
 	}
 
 	return m, nil
+}
+
+func Parse(jwtSerialized string, opts ...ParseOpt) (*JSONWebToken, []byte, error) {
+	if !jose.IsCompactJWS(jwtSerialized) {
+		return nil, nil, errors.New("JWT of compacted JWS form is supported only")
+	}
+
+	pOpts := &parseOpts{}
+	for _, opt := range opts {
+		opt(pOpts)
+	}
+
+	return parseJWS(jwtSerialized, pOpts)
+}
+
+func parseJWS(jwtSerialized string, pOpts *parseOpts) (*JSONWebToken, []byte, error) {
+	jwsOpts := make([]jose.JWSParseOpt, 0)
+
+	if pOpts.detachedPayload != nil {
+		jwsOpts = append(jwsOpts, jose.WithJWSDetachedPayload(pOpts.detachedPayload))
+	}
+
+	jws, err := jose.ParseJWS(jwtSerialized, pOpts.sigVerifier, jwsOpts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse JWT from compact JWS: %w", err)
+	}
+
+	return mapJWSToJWT(jws, pOpts)
+}
+
+func mapJWSToJWT(jws *jose.JSONWebSignature, pOpts *parseOpts) (*JSONWebToken, []byte, error) {
+	headers := jws.ProtectedHeaders
+
+	err := checkHeaders(headers)
+	if err != nil {
+		return nil, nil, fmt.Errorf("check JWT headers: %w", err)
+	}
+
+	token := &JSONWebToken{
+		Headers: headers,
+		jws:     jws,
+	}
+
+	if !pOpts.ignoreClaimsMapDecoding {
+		claims, err := PayloadToMap(jws.Payload)
+		if err != nil {
+			return nil, nil, fmt.Errorf("read JWT claims from JWS payload: %w", err)
+		}
+
+		token.Payload = claims
+	}
+
+	return token, jws.Payload, nil
+}
+
+func checkHeaders(headers map[string]interface{}) error {
+	if _, ok := headers[jose.HeaderAlgorithm]; !ok {
+		return errors.New("alg header is not defined")
+	}
+
+	typ, ok := headers[jose.HeaderType]
+	if ok {
+		if err := checkTypHeader(typ); err != nil {
+			return err
+		}
+	}
+
+	cty, ok := headers[jose.HeaderContentType]
+	if ok && cty == TypeJWT {
+		return errors.New("nested JWT is not supported")
+	}
+
+	return nil
+}
+
+func checkTypHeader(typ interface{}) error {
+	typStr, ok := typ.(string)
+	if !ok {
+		return errors.New("invalid typ header format")
+	}
+
+	chunks := strings.Split(typStr, "+")
+	if len(chunks) > 1 {
+		ending := strings.ToUpper(chunks[1])
+		if ending != TypeJWT && ending != TypeSDJWT {
+			return errors.New("invalid typ header")
+		}
+		return nil
+	}
+
+	if typStr != TypeJWT {
+		return errors.New("typ is not JWT")
+	}
+
+	return nil
 }

@@ -3,11 +3,13 @@ module github.com/czh0526/aries-framework-go/component/models
 go 1.23.9
 
 require (
+	github.com/btcsuite/btcd v0.22.3
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3
-	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
+	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251208043106-351c7e6daee0
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
+	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/google/uuid v1.6.0
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/piprate/json-gold v0.5.0
@@ -17,11 +19,9 @@ require (
 
 require (
 	github.com/IBM/mathlib v0.0.2 // indirect
-	github.com/btcsuite/btcd v0.22.3 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.9.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/hyperledger/fabric-amcl v0.0.0-20210603140002-2670f91851c8 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/mr-tron/base58 v1.1.0 // indirect

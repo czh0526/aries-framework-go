@@ -35,6 +35,14 @@ func GetJWTSigner(signer Signer, algorithm string) *JwtSigner {
 	}
 }
 
+type noVerifier struct{}
+
+func (n noVerifier) Verify(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+	return nil
+}
+
+var _ jose.SignatureVerifier = (*noVerifier)(nil)
+
 func marshalJWS(jwtClaims interface{}, signatureAlg JWSAlgorithm, signer Signer, keyID string) (string, error) {
 	algName, err := signatureAlg.Name()
 	if err != nil {
@@ -58,5 +66,9 @@ func unmarshalJWS(rawJwt string, checkProof bool, fetcher didsignjwt.PublicKeyFe
 
 	if checkProof {
 		verifier = jwt.NewVerifier(jwt.KeyResolveFunc(fetcher))
+	} else {
+		verifier = &noVerifier{}
 	}
+
+	jsonWebToken, claimsRaw, err := jwt.Parse(rawJwt)
 }

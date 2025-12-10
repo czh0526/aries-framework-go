@@ -32,10 +32,10 @@ var _ jose.SignatureVerifier = (*BasicVerifier)(nil)
 type signatureVerifier func(pubKey *sigapi.PublicKey, message, signature []byte) error
 
 func getVerifier(resolver KeyResolver, signatureVerifier signatureVerifier) jose.SignatureVerifier {
-	return func(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+	return jose.SignatureVerifierFunc(func(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
 		return verifySignature(resolver, signatureVerifier,
 			joseHeaders, payload, signingInput, signature)
-	}
+	})
 }
 
 func verifySignature(resolver KeyResolver, signatureVerifier signatureVerifier,
@@ -71,5 +71,12 @@ func NewVerifier(resolver KeyResolver) *BasicVerifier {
 			Alg:      v.Algorithm(),
 			Verifier: getVerifier(resolver, v.Verify),
 		})
+	}
+
+	compositeVrifier := jose.NewCompositeAlgSigVerifier(algVerifiers[0], algVerifiers[1:]...)
+
+	return &BasicVerifier{
+		resolver:          resolver,
+		compositeVerifier: compositeVrifier,
 	}
 }

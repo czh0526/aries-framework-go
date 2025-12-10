@@ -311,3 +311,9 @@ func sign(joseHeaders Headers, payload []byte, signer Signer) ([]byte, error) {
 
 	return signature, nil
 }
+
+func IsCompactJWS(s string) bool {
+	parts := strings.Split(s, ".")
+
+	return len(parts) == jwsPartsCount
+}
