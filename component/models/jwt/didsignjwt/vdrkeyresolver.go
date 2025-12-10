@@ -5,3 +5,7 @@ import (
 )
 
 type PublicKeyFetcher func(issuerID, keyID string) (*signatureapi.PublicKey, error)
+
+type VDRKeyResolver struct {
+	vdr didResolver
+}

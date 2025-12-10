@@ -1,6 +1,6 @@
 module github.com/czh0526/aries-framework-go/component/vdr
 
-go 1.23.7
+go 1.23.9
 
 require (
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20250704014650-3af35ecb5789
@@ -31,6 +31,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace (
-	"github.com/czh0526/aries-framework-go/component/models" => ../models
-)
+replace github.com/czh0526/aries-framework-go/component/models => ../models

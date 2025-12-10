@@ -8,7 +8,7 @@ require (
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
-	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251123150327-e865d0a2866a
+	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251208043106-351c7e6daee0
 	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251206042806-4eaf6ce264e2
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 )
@@ -19,7 +19,7 @@ require (
 	github.com/go-jose/go-jose v2.6.3+incompatible
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang/mock v1.6.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.6.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/piprate/json-gold v0.5.0
 	github.com/rs/cors v1.11.1

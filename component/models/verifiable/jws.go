@@ -57,6 +57,6 @@ func unmarshalJWS(rawJwt string, checkProof bool, fetcher didsignjwt.PublicKeyFe
 	var verifier jose.SignatureVerifier
 
 	if checkProof {
-		verifier = jwt.NewVerifier(jwt.KeyResolverFunc(fetcher))
+		verifier = jwt.NewVerifier(jwt.KeyResolveFunc(fetcher))
 	}
 }
