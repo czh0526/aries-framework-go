@@ -41,3 +41,20 @@ func WithExternalContext(context ...string) Opts {
 		opts.externalContexts = context
 	}
 }
+
+func AppendExternalContexts(context interface{}, extraContexts ...string) []interface{} {
+	var contexts []interface{}
+
+	switch c := context.(type) {
+	case string:
+		contexts = append(contexts, c)
+	case []interface{}:
+		contexts = append(contexts, c...)
+	}
+
+	for i := range extraContexts {
+		contexts = append(contexts, extraContexts[i])
+	}
+
+	return contexts
+}

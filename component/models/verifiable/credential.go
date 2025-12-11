@@ -9,6 +9,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
 	signatureapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
+	sigverifier "github.com/czh0526/aries-framework-go/component/models/signature/verifier"
 	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
 	timeutil "github.com/czh0526/aries-framework-go/component/models/util/time"
 	jsonld "github.com/piprate/json-gold/ld"
@@ -446,7 +447,7 @@ type credentialOpts struct {
 	modelValidationMode   vcModelValidationMode
 	allowedCustomContexts map[string]bool
 	allowedCustomTypes    map[string]bool
-	disableProofCheck     bool
+	disabledProofCheck    bool
 	strictValidation      bool
 	ldpSuites             []signatureapi.SignatureSuite
 	defaultSchema         string

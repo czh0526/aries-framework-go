@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+const (
+	DataIntegrityProof = "DataIntegrityProof"
+)
+
 type Proof struct {
 	ID                 string `json:"id,omitempty"`
 	Type               string `json:"type"`
