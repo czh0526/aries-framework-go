@@ -1,6 +1,8 @@
 package verifiable
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
@@ -70,5 +72,17 @@ func unmarshalJWS(rawJwt string, checkProof bool, fetcher didsignjwt.PublicKeyFe
 		verifier = &noVerifier{}
 	}
 
-	jsonWebToken, claimsRaw, err := jwt.Parse(rawJwt)
+	jsonWebToken, claimsRaw, err := jwt.Parse(rawJwt,
+		jwt.WithSignatureVerifier(verifier),
+		jwt.WithIgnoreClaimsMapDecoding(true))
+	if err != nil {
+		return nil, fmt.Errorf("parse JWT: %w", err)
+	}
+
+	err = json.Unmarshal(claimsRaw, claims)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonWebToken.Headers, nil
 }

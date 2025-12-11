@@ -4,7 +4,7 @@ go 1.23.9
 
 require (
 	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a
-	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
+	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251205111351-aa657dcfcfa7
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd
 	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976

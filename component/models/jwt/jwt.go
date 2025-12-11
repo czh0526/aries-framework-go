@@ -57,6 +57,15 @@ func (j *JSONWebToken) Serialize(detached bool) (string, error) {
 	return j.jws.SerializeCompact(detached)
 }
 
+func (j *JSONWebToken) DecodeClaims(c interface{}) error {
+	pBytes, err := json.Marshal(j.Payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	return json.Unmarshal(pBytes, c)
+}
+
 type unsecuredJWTSigner struct{}
 
 func (s unsecuredJWTSigner) Sign(_ []byte) ([]byte, error) {
@@ -76,6 +85,15 @@ func IsJWS(s string) bool {
 		isValidJSON(parts[0]) &&
 		isValidJSON(parts[1]) &&
 		parts[2] != ""
+}
+
+func IsJWTUnsecured(s string) bool {
+	parts := strings.Split(s, ".")
+
+	return len(parts) == 3 &&
+		isValidJSON(parts[0]) &&
+		isValidJSON(parts[1]) &&
+		parts[2] == ""
 }
 
 func isValidJSON(s string) bool {
@@ -249,4 +267,33 @@ func checkTypHeader(typ interface{}) error {
 	}
 
 	return nil
+}
+
+type signatureVerifierFunc func(joseHeaders jose.Headers, payload, signingInput, signature []byte) error
+
+func (s signatureVerifierFunc) Verify(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+	return s(joseHeaders, payload, signingInput, signature)
+}
+
+var _ jose.SignatureVerifier = (signatureVerifierFunc)(nil)
+
+func verifyUnsecuredJWT(joseHeaders jose.Headers, _, _, signature []byte) error {
+	alg, ok := joseHeaders.Algorithm()
+	if !ok {
+		return errors.New("alg is not defined")
+	}
+
+	if alg != AlgorithmNone {
+		return errors.New("alg value is not `none`")
+	}
+
+	if len(signature) > 0 {
+		return errors.New("not empty signature")
+	}
+
+	return nil
+}
+
+func UnsecuredJWTVerifier() jose.SignatureVerifier {
+	return signatureVerifierFunc(verifyUnsecuredJWT)
 }

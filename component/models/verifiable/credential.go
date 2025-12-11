@@ -124,11 +124,24 @@ func ParseCredential(vcData []byte, opts ...CredentialOpt) (*Credential, error) 
 		sdJWTVersion  common.SDJWTVersion
 	)
 
-	isJWT, vcStr, disclosures, holderBinding := isJWTVC(vcStr)
+	isJWT, vcStr, disclosures, holderBinding = isJWTVC(vcStr)
 	if isJWT {
 		_, vcDataDecoded, err = decodeJWTVC(vcStr, vcOpts)
+		if err != nil {
+			return nil, fmt.Errorf("decode new JWT credential: %w", err)
+		}
+
+		if err = validateDisclosures(vcDataDecoded, disclosures); err != nil {
+			return nil, err
+		}
+
+		externalJWT = vcStr
+
 	} else {
 		vcDataDecoded, err = decodeLDVC(vcData, vcStr, vcOpts)
+		if err != nil {
+			return nil, fmt.Errorf("decode new credential: %w", err)
+		}
 	}
 }
 
@@ -513,4 +526,17 @@ func decodeJWTVC(vcStr string, vcOpts *credentialOpts) (jose.Headers, []byte, er
 	}
 
 	return joseHeaders, vcDecodedBytes, nil
+}
+
+func decodeLDVC(vcData []byte, vcStr string, vcOpts *credentialOpts) ([]byte, error) {
+	if jwt.IsJWTUnsecured(vcStr) {
+		var e error
+
+		vcData, e = decodeCredJWTUnsecured(vcStr)
+		if e != nil {
+			return nil, fmt.Errorf("unsecured JWT decoding: %w", e)
+		}
+
+		return vcData, checkEmbeddedProof(vcData, getEmbeddedProofCheckOpts(vcOpts))
+	}
 }

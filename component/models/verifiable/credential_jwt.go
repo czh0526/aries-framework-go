@@ -23,24 +23,6 @@ type JWTCredClaims struct {
 	VC map[string]interface{} `json:"vc,omitempty"`
 }
 
-type JWTCredClaimsUnmarshaller func(vcJWTBytes string) (jose.Headers, *JWTCredClaims, error)
-
-func decodeCredJWT(rawJWT string, unmarshaller JWTCredClaimsUnmarshaller) (jose.Headers, []byte, error) {
-	joseHeaders, credClaims, err := unmarshaller(rawJWT)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unmarshal VC JWT claims: %w", err)
-	}
-
-	credClaims.refineFromJWTClaims()
-
-	vcData, err := json.Marshal(credClaims.VC)
-	if err != nil {
-		return nil, nil, errors.New("failed to marshal 'vc' claim of JWT")
-	}
-
-	return joseHeaders, vcData, nil
-}
-
 func (jcc *JWTCredClaims) refineFromJWTClaims() {
 	vcMap := jcc.VC
 	claims := jcc.Claims
@@ -67,6 +49,24 @@ func (jcc *JWTCredClaims) refineFromJWTClaims() {
 		expTime := exp.Time().UTC()
 		vcMap[vcExpirationDataField] = expTime.Format(time.RFC3339)
 	}
+}
+
+type JWTCredClaimsUnmarshaller func(vcJWTBytes string) (jose.Headers, *JWTCredClaims, error)
+
+func decodeCredJWT(rawJWT string, unmarshaller JWTCredClaimsUnmarshaller) (jose.Headers, []byte, error) {
+	joseHeaders, credClaims, err := unmarshaller(rawJWT)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unmarshal VC JWT claims: %w", err)
+	}
+
+	credClaims.refineFromJWTClaims()
+
+	vcData, err := json.Marshal(credClaims.VC)
+	if err != nil {
+		return nil, nil, errors.New("failed to marshal 'vc' claim of JWT")
+	}
+
+	return joseHeaders, vcData, nil
 }
 
 func refineVCIssuerFromJWTClaims(vcMap map[string]interface{}, iss string) {
