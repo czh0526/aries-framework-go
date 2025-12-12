@@ -1,6 +1,7 @@
 package verifiable
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -69,4 +70,89 @@ type TypedID struct {
 	Type string `json:"type,omitempty"`
 }
 
+func newTypedID(v interface{}) (TypedID, error) {
+	bytes, err := json.Marshal(v)
+	if err != nil {
+		return TypedID{}, nil
+	}
+
+	var tid TypedID
+	err = json.Unmarshal(bytes, &tid)
+
+	return tid, err
+}
+
+func decodeType(t interface{}) ([]string, error) {
+	switch rType := t.(type) {
+	case string:
+		return []string{rType}, nil
+	case []interface{}:
+		types, err := stringSlice(rType)
+		if err != nil {
+			return nil, fmt.Errorf("vc types: %w", err)
+		}
+		return types, nil
+	default:
+		return nil, errors.New("credential type of unknown structure")
+	}
+}
+
 type Proof map[string]interface{}
+
+func stringSlice(values []interface{}) ([]string, error) {
+	s := make([]string, len(values))
+
+	for i := range values {
+		t, valid := values[i].(string)
+		if !valid {
+			return nil, errors.New("array element is not a string")
+		}
+
+		s[i] = t
+	}
+
+	return s, nil
+}
+
+func parseProof(proofBytes json.RawMessage) ([]Proof, error) {
+	if len(proofBytes) == 0 {
+		return nil, nil
+	}
+
+	var singleProof Proof
+	err := json.Unmarshal(proofBytes, &singleProof)
+	if err == nil {
+		return []Proof{singleProof}, nil
+	}
+
+	var composedProof []Proof
+	err = json.Unmarshal(proofBytes, &composedProof)
+	if err == nil {
+		return composedProof, nil
+	}
+
+	return nil, err
+}
+
+func decodeContext(c interface{}) ([]string, []interface{}, error) {
+	switch rContext := c.(type) {
+	case string:
+		return []string{rContext}, nil, nil
+
+	case []interface{}:
+		s := make([]string, 0)
+
+		for i := range rContext {
+			c, valid := rContext[i].(string)
+			if !valid {
+				return s, rContext[i:], nil
+			}
+
+			s = append(s, c)
+		}
+		return s, nil, nil
+
+	default:
+		return nil, nil, errors.New("credential context of unknown type")
+	}
+}

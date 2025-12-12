@@ -7,7 +7,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/models/dataintegrity/models"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 	jsonld "github.com/czh0526/aries-framework-go/component/models/ld/processor"
-	signatureapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
+	sigapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
 )
 
 type embeddedProofCheckOpts struct {
@@ -15,7 +15,7 @@ type embeddedProofCheckOpts struct {
 
 	publicKeyFetcher   didsignjwt.PublicKeyFetcher
 	disabledProofCheck bool
-	ldpSuites          []signatureapi.SignatureSuite
+	ldpSuites          []sigapi.SignatureSuite
 	dataIntegrityOpts  *verifyDataIntegrityOpts
 }
 
@@ -103,4 +103,8 @@ func getProofs(proofElement interface{}) ([]map[string]interface{}, error) {
 	}
 
 	return nil, errors.New("invalid proof element")
+}
+
+func getSuites(proofs []map[string]interface{}, opts *embeddedProofCheckOpts) ([]sigapi.SignatureSuite, error) {
+	return nil, errors.New("not implemented")
 }

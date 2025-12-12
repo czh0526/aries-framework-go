@@ -15,6 +15,7 @@ func MarshalWithCustomFields(v interface{}, cf map[string]interface{}) ([]byte, 
 }
 
 func UnmarshalWithCustomFields(data []byte, v interface{}, cf map[string]interface{}) error {
+	// 向v中填充数据
 	err := json.Unmarshal(data, v)
 	if err != nil {
 		return err

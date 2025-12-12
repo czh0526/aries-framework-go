@@ -8,8 +8,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
-	signatureapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
-	sigverifier "github.com/czh0526/aries-framework-go/component/models/signature/verifier"
+	sigapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
 	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
 	timeutil "github.com/czh0526/aries-framework-go/component/models/util/time"
 	jsonld "github.com/piprate/json-gold/ld"
@@ -33,11 +32,6 @@ const (
 	schemaPropertyIssuer            = "issuer"
 	schemaPropertyIssuanceDate      = "issuanceDate"
 )
-
-type Issuer struct {
-	ID           string       `json:"id,omitempty"`
-	CustomFields CustomFields `json:"customFields,omitempty"`
-}
 
 type Evidence interface{}
 
@@ -71,7 +65,7 @@ type rawCredential struct {
 	Subject          json.RawMessage       `json:"credentialSubject,omitempty"`
 	Issued           *timeutil.TimeWrapper `json:"issuanceDate,omitempty"`
 	Expired          *timeutil.TimeWrapper `json:"expirationDate,omitempty"`
-	Proof            *json.RawMessage      `json:"proof,omitempty"`
+	Proof            json.RawMessage       `json:"proof,omitempty"`
 	Status           *TypedID              `json:"credentialStatus,omitempty"`
 	Issuer           json.RawMessage       `json:"issuer,omitempty"`
 	Schema           interface{}           `json:"credentialSchema,omitempty"`
@@ -87,6 +81,68 @@ type rawCredential struct {
 
 var _ json.Marshaler = (*rawCredential)(nil)
 var _ json.Unmarshaler = (*rawCredential)(nil)
+
+func newCredential(raw *rawCredential) (*Credential, error) {
+	var schemas []TypedID
+
+	if raw.Schema != nil {
+		var err error
+		schemas, err = decodeCredentialSchemas(raw)
+		if err != nil {
+			return nil, fmt.Errorf("fill credential schemas from raw: %w", err)
+		}
+	} else {
+		schemas = make([]TypedID, 0)
+	}
+
+	types, err := decodeType(raw.Type)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential types from raw: %w", err)
+	}
+
+	issuer, err := parseIssuer(raw.Issuer)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential issuer from raw: %w", err)
+	}
+
+	context, customContext, err := decodeContext(raw.Context)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential context from raw: %w", err)
+	}
+
+	termsOfUse, err := parseTypedID(raw.TermsOfUse)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential terms of use from raw: %w", err)
+	}
+
+	refreshService, err := parseTypedID(raw.RefreshService)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential refresh service from raw: %w", err)
+	}
+
+	proofs, err := parseProof(raw.Proof)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential proof from raw: %w", err)
+	}
+
+	subjects, err := parseSubject(raw.Subject)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential subject from raw: %w", err)
+	}
+
+	return &Credential{
+		Context:        context,
+		CustomContext:  customContext,
+		ID:             raw.ID,
+		Types:          types,
+		Subject:        subjects,
+		Issuer:         issuer,
+		Proofs:         proofs,
+		Schemas:        schemas,
+		TermsOfUse:     termsOfUse,
+		RefreshService: refreshService,
+	}, nil
+}
 
 func (rc *rawCredential) MarshalJSON() ([]byte, error) {
 	type Alias rawCredential
@@ -144,6 +200,116 @@ func ParseCredential(vcData []byte, opts ...CredentialOpt) (*Credential, error) 
 			return nil, fmt.Errorf("decode new credential: %w", err)
 		}
 	}
+
+	vc, err := populateCredential(vcDataDecoded, disclosures, sdJWTVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	if externalJWT == "" && !vcOpts.disableValidation {
+		err = validateCredential(vc, vcDataDecoded, vcOpts)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	vc.JWT = externalJWT
+	vc.SDHolderBinding = holderBinding
+
+	return vc, nil
+}
+
+func populateCredential(vcJSON []byte, sdDisclosures []string, sdJWTVersion common.SDJWTVersion) (*Credential, error) {
+	var raw rawCredential
+
+	err := json.Unmarshal(vcJSON, &raw)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal new credential: %w", err)
+	}
+
+	raw.SDJWTDisclosures = sdDisclosures
+	raw.SDJWTVersion = sdJWTVersion
+
+	vc, err := newCredential(&raw)
+	if err != nil {
+		return nil, fmt.Errorf("build new credential: %w", err)
+	}
+
+	return vc, nil
+}
+
+func decodeCredentialSchemas(data *rawCredential) ([]TypedID, error) {
+	switch schema := data.Schema.(type) {
+	case []interface{}:
+		tids := make([]TypedID, len(schema))
+		for i := range schema {
+			tid, err := newTypedID(schema[i])
+			if err != nil {
+				return nil, err
+			}
+
+			tids[i] = tid
+		}
+		return tids, nil
+
+	case interface{}:
+		tid, err := newTypedID(schema)
+		if err != nil {
+			return nil, err
+		}
+
+		return []TypedID{tid}, nil
+
+	default:
+		return nil, errors.New("verifiable credential schema of unsupported format")
+	}
+}
+
+func parseTypedID(data json.RawMessage) ([]TypedID, error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	var singleTypedID TypedID
+
+	err := json.Unmarshal(data, &singleTypedID)
+	if err == nil {
+		return []TypedID{singleTypedID}, nil
+	}
+
+	var composedTypedID []TypedID
+	err = json.Unmarshal(data, &composedTypedID)
+	if err == nil {
+		return composedTypedID, nil
+	}
+
+	return nil, err
+}
+
+func parseSubject(subjectBytes json.RawMessage) (interface{}, error) {
+	if len(subjectBytes) == 0 {
+		return nil, nil
+	}
+
+	var subjectID string
+	err := json.Unmarshal(subjectBytes, &subjectID)
+	if err == nil {
+		return subjectID, nil
+	}
+
+	var subject Subject
+	err = json.Unmarshal(subjectBytes, &subject)
+	if err == nil {
+		return subject, nil
+	}
+
+	var subjects []Subject
+	err = json.Unmarshal(subjectBytes, &subjects)
+	if err == nil {
+		return subjects, nil
+	}
+
+	return nil, fmt.Errorf("verifiable credential subject of unsupported format")
 }
 
 func getCredentialOpts(opts []CredentialOpt) *credentialOpts {
@@ -449,7 +615,7 @@ type credentialOpts struct {
 	allowedCustomTypes    map[string]bool
 	disabledProofCheck    bool
 	strictValidation      bool
-	ldpSuites             []signatureapi.SignatureSuite
+	ldpSuites             []sigapi.SignatureSuite
 	defaultSchema         string
 	disableValidation     bool
 	verifyDataIntegrity   *verifyDataIntegrityOpts
@@ -517,11 +683,11 @@ func isJWTVC(vcStr string) (bool, string, []string, string) {
 }
 
 func decodeJWTVC(vcStr string, vcOpts *credentialOpts) (jose.Headers, []byte, error) {
-	if vcOpts.publicKeyFetcher == nil && !vcOpts.disableProofCheck {
+	if vcOpts.publicKeyFetcher == nil && !vcOpts.disabledProofCheck {
 		return nil, nil, errors.New("public key fetcher is not defined")
 	}
 
-	joseHeaders, vcDecodedBytes, err := decodeCredJWS(vcStr, !vcOpts.disableProofCheck, vcOpts.publicKeyFetcher)
+	joseHeaders, vcDecodedBytes, err := decodeCredJWS(vcStr, !vcOpts.disabledProofCheck, vcOpts.publicKeyFetcher)
 	if err != nil {
 		return nil, nil, fmt.Errorf("JWS decoding: %w", err)
 	}
@@ -532,12 +698,18 @@ func decodeJWTVC(vcStr string, vcOpts *credentialOpts) (jose.Headers, []byte, er
 func decodeLDVC(vcData []byte, vcStr string, vcOpts *credentialOpts) ([]byte, error) {
 	if jwt.IsJWTUnsecured(vcStr) {
 		var e error
-
 		vcData, e = decodeCredJWTUnsecured(vcStr)
 		if e != nil {
 			return nil, fmt.Errorf("unsecured JWT decoding: %w", e)
 		}
-
-		return vcData, checkEmbeddedProof(vcData, getEmbeddedProofCheckOpts(vcOpts))
 	}
+	return vcData, checkEmbeddedProof(vcData, getEmbeddedProofCheckOpts(vcOpts))
+}
+
+func validateDisclosures(vcBytes []byte, disclosures []string) error {
+	return fmt.Errorf("not implemented")
+}
+
+func validateCredential(vc *Credential, vcBytes []byte, vcOpts *credentialOpts) error {
+	return fmt.Errorf("not implemented")
 }
