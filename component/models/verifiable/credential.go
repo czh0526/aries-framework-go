@@ -1,6 +1,7 @@
 package verifiable
 
 import (
+	"crypto"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/xeipuuv/gojsonschema"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -57,6 +59,206 @@ type Credential struct {
 	SDHolderBinding  string
 	CustomFields     CustomFields
 }
+
+func (vc *Credential) UnmarshalJSON(bytes []byte) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (vc *Credential) MarshalJSON() ([]byte, error) {
+	if vc.JWT != "" {
+		if vc.SDJWTHashAlg != "" {
+			sdJWT, err := vc.MarshalWithDisclosure(DiscloseAll())
+			if err != nil {
+				return nil, err
+			}
+
+			return []byte("\"" + sdJWT + "\""), nil
+		}
+
+		return []byte("\"" + vc.JWT + "\""), nil
+	}
+
+	raw, err := vc.raw()
+	if err != nil {
+		return nil, fmt.Errorf("JSON marshalling of verifiable credential: %w", err)
+	}
+
+	byteCred, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("JSON marshalling of verifiable credential: %w", err)
+	}
+
+	return byteCred, nil
+}
+
+func (vc *Credential) JWTClaims(minimizeVC bool) (*JWTCredClaims, error) {
+	return newJWTCredClaims(vc, minimizeVC)
+}
+
+func (vc *Credential) raw() (*rawCredential, error) {
+	rawRefreshService, err := typedIDToRaw(vc.RefreshService)
+	if err != nil {
+		return nil, err
+	}
+
+	rawTermsOfUse, err := typedIDToRaw(vc.TermsOfUse)
+	if err != nil {
+		return nil, err
+	}
+
+	proof, err := proofsToRaw(vc.Proofs)
+	if err != nil {
+		return nil, err
+	}
+
+	var schema interface{}
+	if len(vc.Schemas) > 0 {
+		schema = vc.Schemas
+	}
+
+	issuer, err := issuerToRaw(vc.Issuer)
+	if err != nil {
+		return nil, err
+	}
+
+	subject, err := subjectToBytes(vc.Subject)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &rawCredential{
+		Context:        contextToRaw(vc.Context, vc.CustomContext),
+		ID:             vc.ID,
+		Type:           typesToRaw(vc.Types),
+		Subject:        subject,
+		Proof:          proof,
+		Status:         vc.Status,
+		Issuer:         issuer,
+		Schema:         schema,
+		Evidence:       vc.Evidence,
+		RefreshService: rawRefreshService,
+		TermsOfUse:     rawTermsOfUse,
+		Issued:         vc.Issued,
+		Expired:        vc.Expired,
+		JWT:            vc.JWT,
+		SDJWTHashAlg:   vc.SDJWTHashAlg,
+		CustomFields:   vc.CustomFields,
+	}
+
+	return r, nil
+}
+
+func contextToRaw(context []string, customContext []interface{}) interface{} {
+	if len(customContext) > 0 {
+		sContext := make([]interface{}, len(context), len(context)+len(customContext))
+
+		for i := range context {
+			sContext[i] = context[i]
+		}
+
+		sContext = append(sContext, customContext...)
+		return sContext
+	}
+
+	return context
+}
+
+func typedIDToRaw(typedIDs []TypedID) ([]byte, error) {
+	switch len(typedIDs) {
+	case 0:
+		return nil, nil
+	case 1:
+		return json.Marshal(typedIDs[0])
+	default:
+		return json.Marshal(typedIDs)
+	}
+}
+
+func proofsToRaw(proofs []Proof) ([]byte, error) {
+	switch len(proofs) {
+	case 0:
+		return nil, nil
+	case 1:
+		return json.Marshal(proofs[0])
+	default:
+		return json.Marshal(proofs)
+	}
+}
+
+func issuerToRaw(issuer Issuer) (json.RawMessage, error) {
+	return issuer.MarshalJSON()
+}
+
+func typesToRaw(types []string) interface{} {
+	if len(types) == 1 {
+		return types[0]
+	}
+
+	return types
+}
+
+func subjectToBytes(subject interface{}) ([]byte, error) {
+	if subject == nil {
+		return nil, nil
+	}
+
+	switch s := subject.(type) {
+	case string:
+		return json.Marshal(s)
+
+	case []map[string]interface{}:
+		if len(s) == 1 {
+			return json.Marshal(s[0])
+		}
+		return json.Marshal(s)
+
+	case map[string]interface{}:
+		return subjectMapToRaw(s)
+
+	case Subject:
+		return s.MarshalJSON()
+
+	case []Subject:
+		if len(s) == 1 {
+			return s[0].MarshalJSON()
+		}
+		return json.Marshal(s)
+
+	default:
+		return subjectStructToRaw(subject)
+	}
+}
+
+func subjectMapToRaw(subject map[string]interface{}) (json.RawMessage, error) {
+	if len(subject) == 1 {
+		if _, ok := subject["id"]; ok {
+			return json.Marshal(safeStringValue(subject["id"]))
+		}
+	}
+	return json.Marshal(subject)
+}
+
+func subjectStructToRaw(subject interface{}) (json.RawMessage, error) {
+	if reflect.TypeOf(subject).Kind() == reflect.Slice {
+		sValue := reflect.ValueOf(subject)
+		subjects := make([]interface{}, sValue.Len())
+
+		for i := 0; i < sValue.Len(); i++ {
+			subjects[i] = sValue.Index(i).Interface()
+		}
+	}
+
+	sMap, err := jsonutil.ToMap(subject)
+	if err != nil {
+		return nil, errors.New("subject of unknown structure")
+	}
+
+	return subjectToBytes(sMap)
+}
+
+var _ json.Marshaler = (*Credential)(nil)
+var _ json.Unmarshaler = (*Credential)(nil)
 
 type rawCredential struct {
 	Context          interface{}           `json:"@context,omitempty"`
@@ -130,17 +332,39 @@ func newCredential(raw *rawCredential) (*Credential, error) {
 		return nil, fmt.Errorf("fill credential subject from raw: %w", err)
 	}
 
+	alg, _ := common.GetCryptoHash(raw.SDJWTHashAlg)
+	if alg == 0 {
+		sub, _ := subjects.([]Subject)
+		if len(sub) > 0 && len(sub[0].CustomFields) > 0 {
+			alg, _ = common.GetCryptoHashFromClaims(sub[0].CustomFields)
+		}
+	}
+
+	disclosures, err := parseDisclosures(raw.SDJWTDisclosures, alg)
+	if err != nil {
+		return nil, fmt.Errorf("fill credential sdjwt disclosures from raw: %w", err)
+	}
+
 	return &Credential{
-		Context:        context,
-		CustomContext:  customContext,
-		ID:             raw.ID,
-		Types:          types,
-		Subject:        subjects,
-		Issuer:         issuer,
-		Proofs:         proofs,
-		Schemas:        schemas,
-		TermsOfUse:     termsOfUse,
-		RefreshService: refreshService,
+		Context:          context,
+		CustomContext:    customContext,
+		ID:               raw.ID,
+		Types:            types,
+		Subject:          subjects,
+		Issuer:           issuer,
+		Issued:           raw.Issued,
+		Expired:          raw.Expired,
+		Proofs:           proofs,
+		Status:           raw.Status,
+		Schemas:          schemas,
+		Evidence:         raw.Evidence,
+		TermsOfUse:       termsOfUse,
+		RefreshService:   refreshService,
+		JWT:              raw.JWT,
+		CustomFields:     raw.CustomFields,
+		SDJWTHashAlg:     raw.SDJWTHashAlg,
+		SDJWTVersion:     raw.SDJWTVersion,
+		SDJWTDisclosures: disclosures,
 	}, nil
 }
 
@@ -164,6 +388,12 @@ func (rc *rawCredential) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+type CustomCredentialProducer interface {
+	Accept(vc *Credential) bool
+
+	Apply(vc *Credential, dataJSON []byte) (interface{}, error)
 }
 
 func ParseCredential(vcData []byte, opts ...CredentialOpt) (*Credential, error) {
@@ -310,6 +540,19 @@ func parseSubject(subjectBytes json.RawMessage) (interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("verifiable credential subject of unsupported format")
+}
+
+func parseDisclosures(disclosures []string, hash crypto.Hash) ([]*common.DisclosureClaim, error) {
+	if len(disclosures) == 0 {
+		return nil, nil
+	}
+
+	disc, err := common.GetDisclosureClaims(disclosures, hash)
+	if err != nil {
+		return nil, fmt.Errorf("parsing disclosures from SD-JWT credential: %w", err)
+	}
+
+	return disc, nil
 }
 
 func getCredentialOpts(opts []CredentialOpt) *credentialOpts {

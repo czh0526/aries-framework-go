@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
-	"github.com/go-jose/go-jose/v3/jwt"
+	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
+	josejwt "github.com/go-jose/go-jose/v3/jwt"
 	"time"
 )
 
@@ -18,9 +19,62 @@ const (
 )
 
 type JWTCredClaims struct {
-	*jwt.Claims
+	*josejwt.Claims
 
 	VC map[string]interface{} `json:"vc,omitempty"`
+}
+
+func newJWTCredClaims(vc *Credential, minimizeVC bool) (*JWTCredClaims, error) {
+	subjectID, err := SubjectID(vc.Subject)
+	if err != nil {
+		return nil, fmt.Errorf("get VC subject id: %w", err)
+	}
+
+	jwtClaims := &josejwt.Claims{
+		Issuer:    vc.Issuer.ID,
+		NotBefore: josejwt.NewNumericDate(vc.Issued.Time),
+		ID:        vc.ID,
+		Subject:   subjectID,
+	}
+
+	if vc.Expired != nil {
+		jwtClaims.Expiry = josejwt.NewNumericDate(vc.Expired.Time)
+	}
+
+	if vc.Issued != nil {
+		jwtClaims.IssuedAt = josejwt.NewNumericDate(vc.Issued.Time)
+	}
+
+	var raw *rawCredential
+	if minimizeVC {
+		vcCopy := *vc
+		vcCopy.Expired = nil
+		vcCopy.Issuer.ID = ""
+		vcCopy.Issued = nil
+		vcCopy.ID = ""
+
+		raw, err = vcCopy.raw()
+	} else {
+		raw, err = vc.raw()
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	raw.JWT = ""
+
+	vcMap, err := jsonutil.MergeCustomFields(raw, raw.CustomFields)
+	if err != nil {
+		return nil, err
+	}
+
+	credClaims := &JWTCredClaims{
+		Claims: jwtClaims,
+		VC:     vcMap,
+	}
+
+	return credClaims, nil
 }
 
 func (jcc *JWTCredClaims) refineFromJWTClaims() {
@@ -81,4 +135,58 @@ func refineVCIssuerFromJWTClaims(vcMap map[string]interface{}, iss string) {
 	case map[string]interface{}:
 		issuer[vcIssuerIDField] = iss
 	}
+}
+
+func SubjectID(subject interface{}) (string, error) {
+	switch subject := subject.(type) {
+	case []Subject:
+		if len(subject) == 0 {
+			return "", errors.New("no subject is defined")
+		}
+		if len(subject) > 1 {
+			return "", errors.New("mor than one subject is defined")
+		}
+
+		return subject[0].ID, nil
+
+	case Subject:
+		return subject.ID, nil
+
+	case map[string]interface{}:
+		return subjectIDFromMap(subject)
+
+	case []map[string]interface{}:
+		if len(subject) == 0 {
+			return "", errors.New("no subject is defined")
+		}
+		if len(subject) > 1 {
+			return "", errors.New("mor than one subject is defined")
+		}
+
+		return subjectIDFromMap(subject[0])
+
+	case string:
+		return subject, nil
+	default:
+		sMap, err := jsonutil.ToMap(subject)
+		if err != nil {
+			return "", errors.New("subject of unknown structure")
+		}
+
+		return SubjectID(sMap)
+	}
+}
+
+func subjectIDFromMap(subject map[string]interface{}) (string, error) {
+	subjectWithID, defined := subject["id"]
+	if !defined {
+		return "", errors.New("subject id is not defined")
+	}
+
+	subjectID, isString := subjectWithID.(string)
+	if !isString {
+		return "", errors.New("subject id is not a string")
+	}
+
+	return subjectID, nil
 }

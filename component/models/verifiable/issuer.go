@@ -3,6 +3,7 @@ package verifiable
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
 )
 
@@ -18,6 +19,8 @@ func (i *Issuer) MarshalJSON() ([]byte, error) {
 
 	type Alias Issuer
 	alias := Alias(*i)
+	fmt.Printf("i = %p, i.CustomFields = %p, alias = %p, alias.CustomFields = %p\n",
+		i, i.CustomFields, &alias, alias.CustomFields)
 	data, err := jsonutil.MarshalWithCustomFields(alias, i.CustomFields)
 	if err != nil {
 		return nil, err

@@ -5,15 +5,6 @@ import (
 	"fmt"
 )
 
-func MarshalWithCustomFields(v interface{}, cf map[string]interface{}) ([]byte, error) {
-	vm, err := MergeCustomFields(v, cf)
-	if err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(vm)
-}
-
 func UnmarshalWithCustomFields(data []byte, v interface{}, cf map[string]interface{}) error {
 	// 向v中填充数据
 	err := json.Unmarshal(data, v)
@@ -47,7 +38,17 @@ func UnmarshalWithCustomFields(data []byte, v interface{}, cf map[string]interfa
 	return nil
 }
 
+func MarshalWithCustomFields(v interface{}, cf map[string]interface{}) ([]byte, error) {
+	vm, err := MergeCustomFields(v, cf)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(vm)
+}
+
 func MergeCustomFields(v interface{}, cf map[string]interface{}) (map[string]interface{}, error) {
+	fmt.Printf("v = %p, cf = %p\n", &v, cf)
 	kf, err := ToMap(v)
 	if err != nil {
 		return nil, err
@@ -59,6 +60,7 @@ func MergeCustomFields(v interface{}, cf map[string]interface{}) (map[string]int
 		}
 	}
 
+	fmt.Printf("kf = %p\n", kf)
 	return kf, nil
 }
 

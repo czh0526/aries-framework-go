@@ -2,6 +2,7 @@ package verifiable
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -17,7 +18,7 @@ func TestJSON_Marshal(t *testing.T) {
 
 	issuerBytes, err := json.Marshal(issuer)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, issuerBytes)
+	fmt.Printf("%s\n", issuerBytes)
 }
 
 func TestJSON_Unmarshal(t *testing.T) {

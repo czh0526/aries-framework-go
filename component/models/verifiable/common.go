@@ -156,3 +156,11 @@ func decodeContext(c interface{}) ([]string, []interface{}, error) {
 		return nil, nil, errors.New("credential context of unknown type")
 	}
 }
+
+func safeStringValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+
+	return v.(string)
+}
