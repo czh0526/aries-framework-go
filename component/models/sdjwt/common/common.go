@@ -234,6 +234,15 @@ func KeyExistsInMap(key string, m map[string]interface{}) bool {
 	return false
 }
 
+func SliceToMap(ids []string) map[string]bool {
+	values := make(map[string]bool)
+	for _, id := range ids {
+		values[id] = true
+	}
+
+	return values
+}
+
 func getMap(value interface{}) (map[string]interface{}, bool) {
 	val, ok := value.(map[string]interface{})
 

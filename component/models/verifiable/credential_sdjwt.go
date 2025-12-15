@@ -2,6 +2,7 @@ package verifiable
 
 import (
 	"crypto"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
@@ -116,4 +117,63 @@ func makeSDJWT(vc *Credential, signer jose.Signer, signingKeyID string,
 	}
 
 	claims, err := vc.JWTClaims(false)
+	if err != nil {
+		return nil, fmt.Errorf("constructing VC JWT claims: %w", err)
+	}
+
+	var claimBytes []byte
+	if opts.version == common.SDJWTVersionV5 {
+		claimBytes, err = claims.ToSDJWTV5CredentialPayload()
+	} else {
+		claimBytes, err = json.Marshal(claims)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	claimMap := map[string]interface{}{}
+	err = json.Unmarshal(claimBytes, &claimMap)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := map[string]interface{}{
+		jose.HeaderKeyID: signingKeyID,
+	}
+
+	if opts.version == common.SDJWTVersionV5 {
+		headers[jose.HeaderType] = "vc+sd-jwt"
+	}
+
+	issuerOptions := []issuer.NewOpt{
+		issuer.WithStructuredClaims(true),
+		issuer.WithSDJWTVersion(opts.version),
+	}
+
+	if len(opts.recursiveClaimsObject) > 0 {
+		issuerOptions = append(issuerOptions,
+			issuer.WithRecursiveClaimsObject(opts.recursiveClaimsObject))
+	}
+
+	if len(opts.alwaysIncludeObjects) > 0 {
+		issuerOptions = append(issuerOptions,
+			issuer.WithAlwaysIncludeObjects(opts.alwaysIncludeObjects))
+	}
+
+	opts.nonSDClaims = append(opts.nonSDClaims, "id")
+	issuerOptions = append(issuerOptions,
+		issuer.WithNonSelectivelyDisclosableClaims(opts.nonSDClaims))
+
+	if opts.hashAlg != 0 {
+		issuerOptions = append(issuerOptions,
+			issuer.WithHashAlgorithm(opts.hashAlg))
+	}
+
+	sdjwt, err := issuer.NewFromVC(claimMap, headers, signer, issuerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("creating SD-JWT from VC: %w", err)
+	}
+
+	return sdjwt, nil
 }

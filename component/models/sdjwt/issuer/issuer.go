@@ -1,8 +1,234 @@
 package issuer
 
-import modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
+import (
+	"crypto"
+	"encoding/json"
+	"fmt"
+	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
+	mathrand "math/rand"
+
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
+	modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
+	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
+	josejwt "github.com/go-jose/go-jose/v3/jwt"
+	"time"
+)
+
+const (
+	defaultHash = crypto.SHA256
+
+	decoyMinElements = 1
+	decoyMaxElements = 4
+
+	credentialSubjectKey = "credentialSubject"
+	vcKey                = "vc"
+)
+
+var mr = mathrand.New(mathrand.NewSource(time.Now().Unix()))
+
+type newOpts struct {
+	Subject  string
+	Audience string
+	JTI      string
+	ID       string
+
+	Expiry    *josejwt.NumericDate
+	NotBefore josejwt.NumericDate
+	IssuedAt  *josejwt.NumericDate
+
+	HolderPublicKey *jwk.JWK
+	HashAlg         crypto.Hash
+
+	jsonMarshal func(v interface{}) ([]byte, error)
+	getSalt     func() (string, error)
+
+	addDecoyDigests  bool
+	structuredClaims bool
+
+	nonSDClaimsMap    map[string]bool
+	version           common.SDJWTVersion
+	alwaysInclude     map[string]bool
+	recursiveClaimMap map[string]bool
+}
+
+type NewOpt func(opts *newOpts)
+
+func WithSDJWTVersion(version common.SDJWTVersion) NewOpt {
+	return func(opts *newOpts) {
+		opts.version = version
+	}
+}
+
+func WithStructuredClaims(flag bool) NewOpt {
+	return func(opts *newOpts) {
+		opts.structuredClaims = flag
+	}
+}
+
+func WithRecursiveClaimsObject(recursiveClaimsObject []string) NewOpt {
+	return func(opts *newOpts) {
+		opts.recursiveClaimMap = common.SliceToMap(recursiveClaimsObject)
+	}
+}
+
+func WithAlwaysIncludeObjects(alwaysIncludeObjects []string) NewOpt {
+	return func(opts *newOpts) {
+		opts.alwaysInclude = common.SliceToMap(alwaysIncludeObjects)
+	}
+}
+
+func WithNonSelectivelyDisclosableClaims(nonSDClaims []string) NewOpt {
+	return func(opts *newOpts) {
+		opts.nonSDClaimsMap = common.SliceToMap(nonSDClaims)
+	}
+}
+
+func WithHashAlgorithm(hashAlg crypto.Hash) NewOpt {
+	return func(opts *newOpts) {
+		opts.HashAlg = hashAlg
+	}
+}
 
 type SelectiveDisclosureJWT struct {
 	SignedJWT   *modeljwt.JSONWebToken
 	Disclosures []string
+}
+
+func NewFromVC(vc map[string]interface{}, headers jose.Headers,
+	signer jose.Signer, opts ...NewOpt) (*SelectiveDisclosureJWT, error) {
+	nOpts := &newOpts{
+		version: common.SDJWTVersionDefault,
+	}
+
+	for _, opt := range opts {
+		opt(nOpts)
+	}
+
+	csObj, ok := common.GetKeyFromVC(credentialSubjectKey, vc)
+	if !ok {
+		return nil, fmt.Errorf("credential subject not found")
+	}
+
+	cs, ok := csObj.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("credential subject must be an object")
+	}
+
+	token, err := New("", cs, nil, &unsecuredJWTSigner{}, opts...)
+
+	return nil, nil
+}
+
+func New(issuer string, claims interface{}, headers jose.Headers,
+	signer jose.Signer, opts ...NewOpt) (*SelectiveDisclosureJWT, error) {
+	nOpts := &newOpts{
+		jsonMarshal:    json.Marshal,
+		HashAlg:        defaultHash,
+		nonSDClaimsMap: make(map[string]bool),
+		version:        common.SDJWTVersionDefault,
+	}
+
+	for _, opt := range opts {
+		opt(nOpts)
+	}
+
+	claimsMap, err := modeljwt.PayloadToMap(claims)
+	if err != nil {
+		return nil, fmt.Errorf("convert payload to map: %w", err)
+	}
+
+	found := common.KeyExistsInMap(common.SDKey, claimsMap)
+	if found {
+		return nil, fmt.Errorf("key '%s' cannot be present in the claims", common.SDKey)
+	}
+
+	sdJWTBuilder := getBuilderByVersion(nOpts.version)
+	if nOpts.getSalt == nil {
+		nOpts.getSalt = sdJWTBuilder.GenerateSalt
+	}
+
+	disclosures, digests, err := sdJWTBuilder.CreateDisclosuresAndDigests("", claimsMap, nOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := jsonutil.MergeCustomFields(createPayload(issuer, nOpts), digests)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge payload and digests: %w", err)
+	}
+
+	decoyDisclosures, err := createDecoyDisclosures(nOpts)
+	if err != nil {
+		return nil, fmt.Errorf("create decoy disclosures: %w", err)
+	}
+
+	disclosures = append(disclosures, decoyDisclosures...)
+}
+
+type payload struct {
+	Issuer   string               `json:"iss,omitempty"`
+	Subject  string               `json:"sub,omitempty"`
+	Audience string               `json:"aud,omitempty"`
+	JTI      string               `json:"jti,omitempty"`
+	Expiry   *josejwt.NumericDate `json:"exp,omitempty"`
+}
+
+func createPayload(issuer string, nOpts *newOpts) *payload {
+	payload := &payload{}
+
+	return payload
+}
+
+func createDecoyDisclosures(opts *newOpts) ([]*DisclosureEntity, error) {
+	if !opts.addDecoyDigests {
+		return nil, nil
+	}
+
+	n := mr.Intn(decoyMaxElements-decoyMinElements+1) + decoyMinElements
+
+	var decoyDisclosures []*DisclosureEntity
+
+	for i := 0; i < n; i++ {
+		salt, err := opts.getSalt()
+		if err != nil {
+			return nil, err
+		}
+
+		decoyDisclosures = append(decoyDisclosures, &DisclosureEntity{
+			Result: salt,
+			Salt:   salt,
+		})
+	}
+
+	return decoyDisclosures, nil
+}
+
+func createDigests(disclosures []*DisclosureEntity, nOpts *newOpts) ([]string, error) {
+	var digests []string
+
+	for _, disclosure := range disclosures {
+		digest, inErr := createDigest(disclosure, nOpts)
+		if inErr != nil {
+			return nil, fmt.Errorf("hash disclosure: %w", inErr)
+		}
+
+		digests = append(digests, digest)
+	}
+
+	mr.Shuffle(len(digests), func(i, j int) {
+		digests[i], digests[j] = digests[j], digests[i]
+	})
+	return digests, nil
+}
+
+func createDigest(disclosure *DisclosureEntity, nOpts *newOpts) (string, error) {
+	digest, inErr := common.GetHash(nOpts.HashAlg, disclosure.Result)
+	if inErr != nil {
+		return "", fmt.Errorf("hash disclosure: %w", inErr)
+	}
+
+	disclosure.DebugDigest = digest
+
+	return digest, nil
 }

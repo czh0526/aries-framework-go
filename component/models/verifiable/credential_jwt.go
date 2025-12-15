@@ -24,6 +24,25 @@ type JWTCredClaims struct {
 	VC map[string]interface{} `json:"vc,omitempty"`
 }
 
+func (jcc *JWTCredClaims) UnmarshalJSON(data []byte) error {
+	type Alias JWTCredClaims
+
+	alias := (*Alias)(jcc)
+	customFields := make(CustomFields)
+	err := jsonutil.UnmarshalWithCustomFields(data, alias, customFields)
+	if err != nil {
+		return fmt.Errorf("unmarshal JWTCredClaims: %w", err)
+	}
+
+	if len(customFields) > 0 && len(alias.VC) == 0 {
+		alias.VC = customFields
+	}
+
+	return nil
+}
+
+var _ json.Unmarshaler = (*JWTCredClaims)(nil)
+
 func newJWTCredClaims(vc *Credential, minimizeVC bool) (*JWTCredClaims, error) {
 	subjectID, err := SubjectID(vc.Subject)
 	if err != nil {
@@ -103,6 +122,20 @@ func (jcc *JWTCredClaims) refineFromJWTClaims() {
 		expTime := exp.Time().UTC()
 		vcMap[vcExpirationDataField] = expTime.Format(time.RFC3339)
 	}
+}
+
+func (jcc *JWTCredClaims) ToSDJWTV5CredentialPayload() ([]byte, error) {
+	type Alias JWTCredClaims
+	alias := Alias(*jcc)
+
+	vcMap := alias.VC
+	alias.VC = nil
+	data, err := jsonutil.MarshalWithCustomFields(alias, vcMap)
+	if err != nil {
+		return nil, fmt.Errorf("marshal JWTW3CCredClaims: %w", err)
+	}
+
+	return data, nil
 }
 
 type JWTCredClaimsUnmarshaller func(vcJWTBytes string) (jose.Headers, *JWTCredClaims, error)
