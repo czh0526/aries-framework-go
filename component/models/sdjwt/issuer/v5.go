@@ -1,8 +1,10 @@
 package issuer
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
 	"reflect"
 )
 
@@ -61,19 +63,158 @@ func (s *SDJWTBuilderV5) createDisclosuresAndDigestsInternal(
 		}
 
 		kind := reflect.TypeOf(value).Kind()
+		// 获取该字段的配置模式
 		valOption := s.extractCredentialClaims(curPath, opts)
 
 		switch kind {
 		case reflect.Map:
+			if valOption.IsIgnored {
+				digestsMap[key] = value
+			} else if valOption.IsRecursive {
+				// 递归创建子Disclosure
+				nestedDisclosures, nestedDigestsMap, mapErr := s.createDisclosuresAndDigestsInternal(
+					curPath,
+					value.(map[string]interface{}),
+					opts,
+					false)
+				if mapErr != nil {
+					return nil, nil, mapErr
+				}
+
+				disclosure, disErr := s.createDisclosure(key, nestedDigestsMap, opts)
+				if disErr != nil {
+					return nil, nil, fmt.Errorf(
+						"create disclosure for recursive disclosure value with path [%v]: %w", path, disErr)
+				}
+
+				if valOption.IsAlwaysInclude {
+					digestsMap[key] = nestedDigestsMap
+				} else {
+					finalSDDigest = append(finalSDDigest, disclosure)
+				}
+				allDisclosures = append(allDisclosures, nestedDisclosures...)
+
+			} else if valOption.IsAlwaysInclude || valOption.IsStructured {
+				nestedDisclosures, nestedDigestsMap, mapErr := s.createDisclosuresAndDigestsInternal(
+					curPath,
+					value.(map[string]interface{}),
+					opts,
+					false)
+				if mapErr != nil {
+					return nil, nil, mapErr
+				}
+
+				digestsMap[key] = nestedDigestsMap
+				allDisclosures = append(allDisclosures, nestedDisclosures...)
+
+			} else {
+				nestedDisclosures, nestedDigestsMap, mapErr := s.createDisclosuresAndDigestsInternal(
+					curPath,
+					value.(map[string]interface{}),
+					opts,
+					true)
+				if mapErr != nil {
+					return nil, nil, mapErr
+				}
+
+				disclosure, disErr := s.createDisclosure(key, nestedDigestsMap, opts)
+				if disErr != nil {
+					return nil, nil, fmt.Errorf(
+						"create disclosure for map object [%v]: %w", path, disErr)
+				}
+
+				finalSDDigest = append(finalSDDigest, disclosure)
+				allDisclosures = append(allDisclosures, nestedDisclosures...)
+			}
 		case reflect.Array:
+			fallthrough
 		case reflect.Slice:
+			if valOption.IsIgnored {
+				digestsMap[key] = value
+				continue
+			}
+
+			elementsDigest, elementsDisclosures, arrayElemErr := s.processArrayElements(value, curPath, opts)
+			if arrayElemErr != nil {
+				return nil, nil, arrayElemErr
+			}
+
+			if valOption.IsAlwaysInclude || valOption.IsStructured {
+				digestsMap[key] = elementsDigest
+			} else {
+				disclosure, disErr := s.createDisclosure(key, elementsDigest, opts)
+				if disErr != nil {
+					return nil, nil, fmt.Errorf("create disclosure for array object [%v]: %w", path, disErr)
+				}
+
+				finalSDDigest = append(finalSDDigest, disclosure)
+			}
+
+			allDisclosures = append(allDisclosures, elementsDisclosures...)
+
 		default:
 			if valOption.IsIgnored || ignorePrimitives {
 				digestsMap[key] = value
 				continue
 			}
+
+			disclosure, disErr := s.createDisclosure(key, value, opts)
+			if disErr != nil {
+				return nil, nil, fmt.Errorf("create disclosure for simple value with path [%v]: %w",
+					path, disErr)
+			}
+
+			finalSDDigest = append(finalSDDigest, disclosure)
 		}
 	}
+
+	digests, err := createDigests(finalSDDigest, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(digests) > 0 {
+		digestsMap[common.SDKey] = digests
+	}
+
+	return append(finalSDDigest, allDisclosures...), digestsMap, nil
+}
+
+func (s *SDJWTBuilderV5) processArrayElements(
+	value interface{},
+	path string,
+	opts *newOpts) ([]interface{}, []*DisclosureEntity, error) {
+	valSl := reflect.ValueOf(value)
+	var (
+		digestArr           []interface{}
+		elementsDisclosures []*DisclosureEntity
+	)
+
+	for i := 0; i < valSl.Len(); i++ {
+		elementPath := fmt.Sprintf("%v[%v]", path, i)
+		elementOptions := s.extractValueOptions(elementPath, opts)
+		elementValue := valSl.Index(i).Interface()
+
+		if elementOptions.IsIgnored {
+			digestArr = append(digestArr, elementValue)
+			continue
+		}
+
+		disclosure, err := s.createDisclosure("", elementValue, opts)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create disclosure for path [%v]: %w", path, err)
+		}
+
+		digest, err := createDigest(disclosure, opts)
+		if err != nil {
+
+		}
+
+		elementsDisclosures = append(elementsDisclosures, disclosure)
+		digestArr = append(digestArr, map[string]string{common.ArrayElementDigestKey: digest})
+	}
+
+	return digestArr, elementsDisclosures, nil
 }
 
 func (s *SDJWTBuilderV5) createDisclosure(
@@ -85,9 +226,38 @@ func (s *SDJWTBuilderV5) createDisclosure(
 	}
 
 	salt, err := opts.getSalt()
+	if err != nil {
+		return nil, fmt.Errorf("generate salt: %w", err)
+	}
 
+	finalDis := &DisclosureEntity{
+		Salt: salt,
+	}
+
+	disclosure := []interface{}{salt}
+	if key != "" {
+		disclosure = append(disclosure, key)
+	}
+	disclosure = append(disclosure, value)
+
+	disclosureBytes, err := opts.jsonMarshal(disclosure)
+	if err != nil {
+		return nil, fmt.Errorf("marshal disclosure: %w", err)
+	}
+
+	finalDis.Key = key
+	finalDis.Value = value
+	finalDis.Result = base64.RawURLEncoding.EncodeToString(disclosureBytes)
+
+	if s.debugMode {
+		finalDis.DebugArr = disclosure
+		finalDis.DebugStr = string(disclosureBytes)
+	}
+
+	return finalDis, nil
 }
 
+// extractCredentialClaims 根据 path 获取字段对应的配置项
 func (s *SDJWTBuilderV5) extractCredentialClaims(curPath string, opts *newOpts) valueOption {
 	return valueOption{
 		IsStructured:    opts.structuredClaims,

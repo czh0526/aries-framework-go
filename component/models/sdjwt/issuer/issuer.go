@@ -43,11 +43,11 @@ type newOpts struct {
 	jsonMarshal func(v interface{}) ([]byte, error)
 	getSalt     func() (string, error)
 
-	addDecoyDigests  bool
-	structuredClaims bool
+	addDecoyDigests bool
+	version         common.SDJWTVersion
 
+	structuredClaims  bool
 	nonSDClaimsMap    map[string]bool
-	version           common.SDJWTVersion
 	alwaysInclude     map[string]bool
 	recursiveClaimMap map[string]bool
 }
