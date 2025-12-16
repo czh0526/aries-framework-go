@@ -37,8 +37,7 @@ func (s *SDJWTBuilderV5) ExtractCredentialClaims(vcClaims map[string]interface{}
 }
 
 func (s *SDJWTBuilderV5) GenerateSalt() (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return generateSalt(s.saltSize)
 }
 
 var _ builder = (*SDJWTBuilderV5)(nil)
@@ -64,7 +63,7 @@ func (s *SDJWTBuilderV5) createDisclosuresAndDigestsInternal(
 
 		kind := reflect.TypeOf(value).Kind()
 		// 获取该字段的配置模式
-		valOption := s.extractCredentialClaims(curPath, opts)
+		valOption := s.extractValueOptions(curPath, opts)
 
 		switch kind {
 		case reflect.Map:
@@ -257,8 +256,8 @@ func (s *SDJWTBuilderV5) createDisclosure(
 	return finalDis, nil
 }
 
-// extractCredentialClaims 根据 path 获取字段对应的配置项
-func (s *SDJWTBuilderV5) extractCredentialClaims(curPath string, opts *newOpts) valueOption {
+// extractValueOptions 根据 path 获取字段对应的配置项
+func (s *SDJWTBuilderV5) extractValueOptions(curPath string, opts *newOpts) valueOption {
 	return valueOption{
 		IsStructured:    opts.structuredClaims,
 		IsAlwaysInclude: s.isAlwaysInclude(curPath, opts),

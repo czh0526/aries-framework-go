@@ -2,6 +2,8 @@ package issuer
 
 import (
 	"crypto"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
@@ -11,6 +13,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
 	modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
+	"github.com/czh0526/aries-framework-go/component/models/util/maphelpers"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
 	"time"
 )
@@ -116,8 +119,39 @@ func NewFromVC(vc map[string]interface{}, headers jose.Headers,
 	}
 
 	token, err := New("", cs, nil, &unsecuredJWTSigner{}, opts...)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	vcClaims, err := getBuilderByVersion(nOpts.version).ExtractCredentialClaims(vc)
+	if err != nil {
+		return nil, err
+	}
+
+	selectiveCredentialSubject := maphelpers.CopyMap(token.SignedJWT.Payload)
+
+	vcClaims[common.SDAlgorithmKey] = selectiveCredentialSubject[common.SDAlgorithmKey]
+	delete(selectiveCredentialSubject, common.SDAlgorithmKey)
+
+	cnfObj, ok := selectiveCredentialSubject[common.CNFKey]
+	if ok {
+		vcClaims[common.CNFKey] = cnfObj
+		delete(selectiveCredentialSubject, common.CNFKey)
+	}
+
+	vcClaims[credentialSubjectKey] = selectiveCredentialSubject
+
+	signedJWT, err := modeljwt.NewSigned(vc, headers, signer)
+	if err != nil {
+		return nil, err
+	}
+
+	sdJWT := &SelectiveDisclosureJWT{
+		Disclosures: token.Disclosures,
+		SignedJWT:   signedJWT,
+	}
+
+	return sdJWT, nil
 }
 
 func New(issuer string, claims interface{}, headers jose.Headers,
@@ -158,12 +192,20 @@ func New(issuer string, claims interface{}, headers jose.Headers,
 		return nil, fmt.Errorf("failed to merge payload and digests: %w", err)
 	}
 
-	decoyDisclosures, err := createDecoyDisclosures(nOpts)
+	signedJWT, err := modeljwt.NewSigned(claims, headers, signer)
 	if err != nil {
-		return nil, fmt.Errorf("create decoy disclosures: %w", err)
+		return nil, fmt.Errorf("failed to create SD-JWT from payload[%+v]: %w", payload, err)
 	}
 
-	disclosures = append(disclosures, decoyDisclosures...)
+	var disArr []string
+	for _, d := range disclosures {
+		disArr = append(disArr, d.Result)
+	}
+
+	return &SelectiveDisclosureJWT{
+		Disclosures: disArr,
+		SignedJWT:   signedJWT,
+	}, nil
 }
 
 type payload struct {
@@ -231,4 +273,28 @@ func createDigest(disclosure *DisclosureEntity, nOpts *newOpts) (string, error) 
 	disclosure.DebugDigest = digest
 
 	return digest, nil
+}
+
+func generateSalt(sizeBytes int) (string, error) {
+	salt := make([]byte, sizeBytes)
+
+	_, err := rand.Read(salt)
+	if err != nil {
+		return "", err
+	}
+
+	// it is RECOMMENDED to base64url-encode the salt value, producing a string.
+	return base64.RawURLEncoding.EncodeToString(salt), nil
+}
+
+type unsecuredJWTSigner struct{}
+
+func (s unsecuredJWTSigner) Sign(_ []byte) ([]byte, error) {
+	return []byte(""), nil
+}
+
+func (s unsecuredJWTSigner) Headers() jose.Headers {
+	return map[string]interface{}{
+		jose.HeaderAlgorithm: modeljwt.AlgorithmNone,
+	}
 }
