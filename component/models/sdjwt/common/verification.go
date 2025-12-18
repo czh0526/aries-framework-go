@@ -6,7 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	docjose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
+	"github.com/czh0526/aries-framework-go/component/models/util/maphelpers"
+	josejwt "github.com/go-jose/go-jose/v3/jwt"
+	"github.com/mitchellh/mapstructure"
 	"slices"
+	"time"
 )
 
 func getDisclosureClaims(disclosures []string, hash crypto.Hash) (map[string]*DisclosureClaim, error) {
@@ -103,6 +109,7 @@ func enrichWithSDElement(claim *DisclosureClaim, disclosureElementsArr []interfa
 }
 
 func discloseClaimValue(claim interface{}, recData *recursiveData) (interface{}, error) {
+
 	switch disclosureValue := claim.(type) {
 	case []interface{}:
 		var newValues []interface{}
@@ -259,6 +266,108 @@ func setDisclosureClaimValue(recData *recursiveData, disclosureClaim *Disclosure
 
 	disclosureClaim.Value = newValue
 	disclosureClaim.IsValueParsed = true
+
+	return nil
+}
+
+func VerifySigningAlg(joseHeaders docjose.Headers, secureAlgs []string) error {
+	alg, ok := joseHeaders.Algorithm()
+	if !ok {
+		return fmt.Errorf("missing alg")
+	}
+
+	if alg == modeljwt.AlgorithmNone {
+		return fmt.Errorf("alg value cannot be `none`")
+	}
+
+	if !contains(secureAlgs, alg) {
+		return fmt.Errorf("alg `%s` is not in the allowed list", alg)
+	}
+
+	return nil
+}
+
+func contains(values []string, val string) bool {
+	for _, v := range values {
+		if v == val {
+			return true
+		}
+	}
+
+	return false
+}
+
+func VerifyJWT(signedJWT *modeljwt.JSONWebToken, leeway time.Duration) error {
+	var claims josejwt.Claims
+
+	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &claims,
+		TagName:          "json",
+		Squash:           true,
+		WeaklyTypedInput: true,
+		DecodeHook:       maphelpers.JSONNumberToJwtNumericDate(),
+	})
+	if err != nil {
+		return fmt.Errorf("mapstruct verifyJWT failed. error: %w", err)
+	}
+
+	if err = d.Decode(signedJWT.Payload); err != nil {
+		return fmt.Errorf("mapstruct verifyJWT decode failed. error: %w", err)
+	}
+
+	expected := josejwt.Expected{}
+
+	err = claims.ValidateWithLeeway(expected, leeway)
+	if err != nil {
+		return fmt.Errorf("invalid JWT time values: %w", err)
+	}
+
+	return nil
+}
+
+func VerifyDisclosuresInSDJWT(
+	disclosures []string,
+	signedJWT *modeljwt.JSONWebToken) error {
+	claims := maphelpers.CopyMap(signedJWT.Payload)
+
+	cryptoHash, err := GetCryptoHashFromClaims(claims)
+	if err != nil {
+		return err
+	}
+
+	parsedDisclosureClaims, err := getDisclosureClaims(disclosures, cryptoHash)
+	if err != nil {
+		return err
+	}
+
+	recData := &recursiveData{
+		disclosures:          parsedDisclosureClaims,
+		cleanupDigestsClaims: false,
+	}
+
+	_, err = discloseClaimValue(claims, recData)
+	if err != nil {
+		return err
+	}
+
+	for _, disclosure := range parsedDisclosureClaims {
+		if !disclosure.IsValueParsed {
+			return fmt.Errorf("disclosure digest `%s` not found in SD-JWT disclosure digests", disclosure.Digest)
+		}
+	}
+
+	return nil
+}
+
+func VerifyTyp(joseHeaders docjose.Headers, expectedTyp string) error {
+	typ, ok := joseHeaders.Type()
+	if !ok {
+		return fmt.Errorf("missing typ")
+	}
+
+	if typ != expectedTyp {
+		return fmt.Errorf("unexpected typ `%s`", typ)
+	}
 
 	return nil
 }

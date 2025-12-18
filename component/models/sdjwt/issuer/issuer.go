@@ -5,16 +5,17 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
-	mathrand "math/rand"
-
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
 	modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
+	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
 	"github.com/czh0526/aries-framework-go/component/models/util/maphelpers"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
+	mathrand "math/rand"
+	"strings"
 	"time"
 )
 
@@ -37,7 +38,7 @@ type newOpts struct {
 	ID       string
 
 	Expiry    *josejwt.NumericDate
-	NotBefore josejwt.NumericDate
+	NotBefore *josejwt.NumericDate
 	IssuedAt  *josejwt.NumericDate
 
 	HolderPublicKey *jwk.JWK
@@ -90,6 +91,24 @@ func WithNonSelectivelyDisclosableClaims(nonSDClaims []string) NewOpt {
 func WithHashAlgorithm(hashAlg crypto.Hash) NewOpt {
 	return func(opts *newOpts) {
 		opts.HashAlg = hashAlg
+	}
+}
+
+func WithNotBefore(notBefore *josejwt.NumericDate) NewOpt {
+	return func(opts *newOpts) {
+		opts.NotBefore = notBefore
+	}
+}
+
+func WithIssuedAt(issuedAt *josejwt.NumericDate) NewOpt {
+	return func(opts *newOpts) {
+		opts.IssuedAt = issuedAt
+	}
+}
+
+func WithExpiry(expiry *josejwt.NumericDate) NewOpt {
+	return func(opts *newOpts) {
+		opts.Expiry = expiry
 	}
 }
 
@@ -174,25 +193,29 @@ func New(issuer string, claims interface{}, headers jose.Headers,
 
 	found := common.KeyExistsInMap(common.SDKey, claimsMap)
 	if found {
-		return nil, fmt.Errorf("key '%s' cannot be present in the claims", common.SDKey)
+		return nil, fmt.Errorf("key `%s` cannot be present in the claims", common.SDKey)
 	}
 
+	// 构造 SD-JWT Builder
 	sdJWTBuilder := getBuilderByVersion(nOpts.version)
 	if nOpts.getSalt == nil {
 		nOpts.getSalt = sdJWTBuilder.GenerateSalt
 	}
 
+	// 构造 DisclosureEntities
 	disclosures, digests, err := sdJWTBuilder.CreateDisclosuresAndDigests("", claimsMap, nOpts)
 	if err != nil {
 		return nil, err
 	}
 
+	// 构造 payload
 	payload, err := jsonutil.MergeCustomFields(createPayload(issuer, nOpts), digests)
 	if err != nil {
 		return nil, fmt.Errorf("failed to merge payload and digests: %w", err)
 	}
 
-	signedJWT, err := modeljwt.NewSigned(claims, headers, signer)
+	// 构造 JWS
+	signedJWT, err := modeljwt.NewSigned(payload, headers, signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SD-JWT from payload[%+v]: %w", payload, err)
 	}
@@ -208,20 +231,63 @@ func New(issuer string, claims interface{}, headers jose.Headers,
 	}, nil
 }
 
+func (j *SelectiveDisclosureJWT) Serialize(detached bool) (string, error) {
+	if j.SignedJWT == nil {
+		return "", errors.New("JWS serialization is supported only")
+	}
+
+	signedJWT, err := j.SignedJWT.Serialize(detached)
+	if err != nil {
+		return "", err
+	}
+
+	cf := common.CombinedFormatForIssuance{
+		SDJWT:       signedJWT,
+		Disclosures: j.Disclosures,
+	}
+
+	return cf.Serialize(), nil
+}
+
 type payload struct {
-	Issuer   string               `json:"iss,omitempty"`
-	Subject  string               `json:"sub,omitempty"`
-	Audience string               `json:"aud,omitempty"`
-	JTI      string               `json:"jti,omitempty"`
-	Expiry   *josejwt.NumericDate `json:"exp,omitempty"`
+	Issuer    string               `json:"iss,omitempty"`
+	Subject   string               `json:"sub,omitempty"`
+	Audience  string               `json:"aud,omitempty"`
+	JTI       string               `json:"jti,omitempty"`
+	Expiry    *josejwt.NumericDate `json:"exp,omitempty"`
+	NotBefore *josejwt.NumericDate `json:"nbf,omitempty"`
+	IssuedAt  *josejwt.NumericDate `json:"iat,omitempty"`
+	ID        string               `json:"id,omitempty"`
+
+	// SD-JWT 相关
+	CNF   map[string]interface{} `json:"cnf,omitempty"`
+	SDAlg string                 `json:"_sd_alg,omitempty"`
 }
 
 func createPayload(issuer string, nOpts *newOpts) *payload {
-	payload := &payload{}
+	var cnf map[string]interface{}
+	if nOpts.HolderPublicKey != nil {
+		cnf = make(map[string]interface{})
+		cnf["jwk"] = nOpts.HolderPublicKey
+	}
+
+	payload := &payload{
+		Issuer:    issuer,
+		JTI:       nOpts.JTI,
+		ID:        nOpts.ID,
+		Subject:   nOpts.Subject,
+		Audience:  nOpts.Audience,
+		IssuedAt:  nOpts.IssuedAt,
+		Expiry:    nOpts.Expiry,
+		NotBefore: nOpts.NotBefore,
+		CNF:       cnf,
+		SDAlg:     strings.ToLower(nOpts.HashAlg.String()),
+	}
 
 	return payload
 }
 
+// createDecoyDisclosures 创建随机数量的 DisclosureEntity 用于混淆
 func createDecoyDisclosures(opts *newOpts) ([]*DisclosureEntity, error) {
 	if !opts.addDecoyDigests {
 		return nil, nil

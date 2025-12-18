@@ -48,7 +48,6 @@ func MarshalWithCustomFields(v interface{}, cf map[string]interface{}) ([]byte, 
 }
 
 func MergeCustomFields(v interface{}, cf map[string]interface{}) (map[string]interface{}, error) {
-	fmt.Printf("v = %p, cf = %p\n", &v, cf)
 	kf, err := ToMap(v)
 	if err != nil {
 		return nil, err
@@ -59,8 +58,7 @@ func MergeCustomFields(v interface{}, cf map[string]interface{}) (map[string]int
 			kf[key] = val
 		}
 	}
-
-	fmt.Printf("kf = %p\n", kf)
+	
 	return kf, nil
 }
 

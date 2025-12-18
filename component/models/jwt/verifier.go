@@ -2,10 +2,15 @@ package jwt
 
 import (
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	docjose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	sigapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
 	sigverifier "github.com/czh0526/aries-framework-go/component/models/signature/verifier"
+	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"strings"
+)
+
+const (
+	signatureEdDSA = "EdDSA"
 )
 
 type KeyResolver interface {
@@ -20,26 +25,40 @@ func (k KeyResolveFunc) Resolve(what, kid string) (*sigapi.PublicKey, error) {
 
 type BasicVerifier struct {
 	resolver          KeyResolver
-	compositeVerifier *jose.CompositeAlgSigVerifier
+	compositeVerifier *docjose.CompositeAlgSigVerifier
 }
 
-func (v BasicVerifier) Verify(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+func (v BasicVerifier) Verify(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error {
 	return v.compositeVerifier.Verify(joseHeaders, payload, signingInput, signature)
 }
 
-var _ jose.SignatureVerifier = (*BasicVerifier)(nil)
+var _ docjose.SignatureVerifier = (*BasicVerifier)(nil)
 
 type signatureVerifier func(pubKey *sigapi.PublicKey, message, signature []byte) error
 
-func getVerifier(resolver KeyResolver, signatureVerifier signatureVerifier) jose.SignatureVerifier {
-	return jose.SignatureVerifierFunc(func(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+func getPublicKeyVerifier(publicKey *sigapi.PublicKey, v sigverifier.SignatureVerifier) docjose.SignatureVerifier {
+	return docjose.SignatureVerifierFunc(func(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error {
+		alg, ok := joseHeaders.Algorithm()
+		if !ok {
+			return fmt.Errorf("`alg` JOSE header is not present")
+		}
+		if alg != v.Algorithm() {
+			return fmt.Errorf("alg %s does not match public key algorithm %s", alg, v.Algorithm())
+		}
+
+		return v.Verify(publicKey, signingInput, signature)
+	})
+}
+
+func getVerifier(resolver KeyResolver, signatureVerifier signatureVerifier) docjose.SignatureVerifier {
+	return docjose.SignatureVerifierFunc(func(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error {
 		return verifySignature(resolver, signatureVerifier,
 			joseHeaders, payload, signingInput, signature)
 	})
 }
 
 func verifySignature(resolver KeyResolver, signatureVerifier signatureVerifier,
-	joseHeaders jose.Headers, _, signingInput, signature []byte) error {
+	joseHeaders docjose.Headers, _, signingInput, signature []byte) error {
 	kid, _ := joseHeaders.KeyID()
 
 	if !strings.HasPrefix(kid, "did:") {
@@ -65,18 +84,55 @@ func NewVerifier(resolver KeyResolver) *BasicVerifier {
 		sigverifier.NewRSARS256SignatureVerifier(),
 	}
 
-	algVerifiers := make([]jose.AlgSignatureVerifier, 0, len(verifiers))
+	algVerifiers := make([]docjose.AlgSignatureVerifier, 0, len(verifiers))
 	for _, v := range verifiers {
-		algVerifiers = append(algVerifiers, jose.AlgSignatureVerifier{
+		algVerifiers = append(algVerifiers, docjose.AlgSignatureVerifier{
 			Alg:      v.Algorithm(),
 			Verifier: getVerifier(resolver, v.Verify),
 		})
 	}
 
-	compositeVrifier := jose.NewCompositeAlgSigVerifier(algVerifiers[0], algVerifiers[1:]...)
+	compositeVrifier := docjose.NewCompositeAlgSigVerifier(algVerifiers[0], algVerifiers[1:]...)
 
 	return &BasicVerifier{
 		resolver:          resolver,
 		compositeVerifier: compositeVrifier,
 	}
+}
+
+func GetVerifier(publicKey *sigapi.PublicKey) (*BasicVerifier, error) {
+	keyType, err := publicKey.JWK.KeyType()
+	if err != nil {
+		return nil, err
+	}
+
+	var v sigverifier.SignatureVerifier
+	switch keyType {
+	case spikms.ECDSAP256TypeDER, spikms.ECDSAP256TypeIEEEP1363:
+		v = sigverifier.NewECDSAES256SignatureVerifier()
+	case spikms.ECDSAP384TypeDER, spikms.ECDSAP384TypeIEEEP1363:
+		v = sigverifier.NewECDSAES384SignatureVerifier()
+	case spikms.ECDSAP521TypeDER, spikms.ECDSAP521TypeIEEEP1363:
+		v = sigverifier.NewECDSAES521SignatureVerifier()
+	case spikms.ED25519Type:
+		v = sigverifier.NewEd25519SignatureVerifier()
+	case spikms.ECDSASecp256k1TypeDER, spikms.ECDSASecp256k1TypeIEEEP1363:
+		v = sigverifier.NewECDSASecp256k1SignatureVerifier()
+	case spikms.RSAPS256Type:
+		v = sigverifier.NewRSAPS256SignatureVerifier()
+	case spikms.RSARS256Type:
+		v = sigverifier.NewRSARS256SignatureVerifier()
+	default:
+		return nil, fmt.Errorf("unsupported key type: %s", keyType)
+	}
+
+	compositeVerifier := docjose.NewCompositeAlgSigVerifier(
+		docjose.AlgSignatureVerifier{
+			Alg:      v.Algorithm(),
+			Verifier: getPublicKeyVerifier(publicKey, v),
+		})
+
+	return &BasicVerifier{
+		compositeVerifier: compositeVerifier,
+	}, nil
 }

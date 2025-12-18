@@ -206,7 +206,7 @@ func (s *SDJWTBuilderV5) processArrayElements(
 
 		digest, err := createDigest(disclosure, opts)
 		if err != nil {
-
+			return nil, nil, fmt.Errorf("can not create digest for array element [%v]: %w", elementPath, err)
 		}
 
 		elementsDisclosures = append(elementsDisclosures, disclosure)

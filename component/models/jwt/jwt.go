@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	docjose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"reflect"
 	"strings"
 )
@@ -19,7 +19,7 @@ const (
 
 type parseOpts struct {
 	detachedPayload         []byte
-	sigVerifier             jose.SignatureVerifier
+	sigVerifier             docjose.SignatureVerifier
 	ignoreClaimsMapDecoding bool
 }
 
@@ -37,16 +37,16 @@ func WithIgnoreClaimsMapDecoding(ignoreClaimsMapDecoding bool) ParseOpt {
 	}
 }
 
-func WithSignatureVerifier(signatureVerifier jose.SignatureVerifier) ParseOpt {
+func WithSignatureVerifier(signatureVerifier docjose.SignatureVerifier) ParseOpt {
 	return func(opts *parseOpts) {
 		opts.sigVerifier = signatureVerifier
 	}
 }
 
 type JSONWebToken struct {
-	Headers jose.Headers
+	Headers docjose.Headers
 	Payload map[string]interface{}
-	jws     *jose.JSONWebSignature
+	jws     *docjose.JSONWebSignature
 }
 
 func (j *JSONWebToken) Serialize(detached bool) (string, error) {
@@ -72,9 +72,9 @@ func (s unsecuredJWTSigner) Sign(_ []byte) ([]byte, error) {
 	return []byte(""), nil
 }
 
-func (s unsecuredJWTSigner) Headers() jose.Headers {
+func (s unsecuredJWTSigner) Headers() docjose.Headers {
 	return map[string]interface{}{
-		jose.HeaderAlgorithm: AlgorithmNone,
+		docjose.HeaderAlgorithm: AlgorithmNone,
 	}
 }
 
@@ -109,15 +109,15 @@ func isValidJSON(s string) bool {
 }
 
 // NewSigned 构建一个签名的 JWT 对象
-func NewSigned(claims interface{}, headers jose.Headers, signer jose.Signer) (*JSONWebToken, error) {
+func NewSigned(claims interface{}, headers docjose.Headers, signer docjose.Signer) (*JSONWebToken, error) {
 	return newSigned(claims, headers, signer)
 }
 
-func NewUnsecured(claims interface{}, headers jose.Headers) (*JSONWebToken, error) {
+func NewUnsecured(claims interface{}, headers docjose.Headers) (*JSONWebToken, error) {
 	return newSigned(claims, headers, &unsecuredJWTSigner{})
 }
 
-func newSigned(claims interface{}, headers jose.Headers, signer jose.Signer) (*JSONWebToken, error) {
+func newSigned(claims interface{}, headers docjose.Headers, signer docjose.Signer) (*JSONWebToken, error) {
 	payloadMap, err := PayloadToMap(claims)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshallable claims: %w", err)
@@ -128,7 +128,7 @@ func newSigned(claims interface{}, headers jose.Headers, signer jose.Signer) (*J
 		return nil, fmt.Errorf("marshal JWT claims: %w", err)
 	}
 
-	jws, err := jose.NewJWS(headers, nil, payloadBytes, signer)
+	jws, err := docjose.NewJWS(headers, nil, payloadBytes, signer)
 	if err != nil {
 		return nil, fmt.Errorf("create JWS: %w", err)
 	}
@@ -175,7 +175,7 @@ func PayloadToMap(i interface{}) (map[string]interface{}, error) {
 }
 
 func Parse(jwtSerialized string, opts ...ParseOpt) (*JSONWebToken, []byte, error) {
-	if !jose.IsCompactJWS(jwtSerialized) {
+	if !docjose.IsCompactJWS(jwtSerialized) {
 		return nil, nil, errors.New("JWT of compacted JWS form is supported only")
 	}
 
@@ -188,13 +188,13 @@ func Parse(jwtSerialized string, opts ...ParseOpt) (*JSONWebToken, []byte, error
 }
 
 func parseJWS(jwtSerialized string, pOpts *parseOpts) (*JSONWebToken, []byte, error) {
-	jwsOpts := make([]jose.JWSParseOpt, 0)
+	jwsOpts := make([]docjose.JWSParseOpt, 0)
 
 	if pOpts.detachedPayload != nil {
-		jwsOpts = append(jwsOpts, jose.WithJWSDetachedPayload(pOpts.detachedPayload))
+		jwsOpts = append(jwsOpts, docjose.WithJWSDetachedPayload(pOpts.detachedPayload))
 	}
 
-	jws, err := jose.ParseJWS(jwtSerialized, pOpts.sigVerifier, jwsOpts...)
+	jws, err := docjose.ParseJWS(jwtSerialized, pOpts.sigVerifier, jwsOpts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse JWT from compact JWS: %w", err)
 	}
@@ -202,7 +202,7 @@ func parseJWS(jwtSerialized string, pOpts *parseOpts) (*JSONWebToken, []byte, er
 	return mapJWSToJWT(jws, pOpts)
 }
 
-func mapJWSToJWT(jws *jose.JSONWebSignature, pOpts *parseOpts) (*JSONWebToken, []byte, error) {
+func mapJWSToJWT(jws *docjose.JSONWebSignature, pOpts *parseOpts) (*JSONWebToken, []byte, error) {
 	headers := jws.ProtectedHeaders
 
 	err := checkHeaders(headers)
@@ -228,18 +228,18 @@ func mapJWSToJWT(jws *jose.JSONWebSignature, pOpts *parseOpts) (*JSONWebToken, [
 }
 
 func checkHeaders(headers map[string]interface{}) error {
-	if _, ok := headers[jose.HeaderAlgorithm]; !ok {
+	if _, ok := headers[docjose.HeaderAlgorithm]; !ok {
 		return errors.New("alg header is not defined")
 	}
 
-	typ, ok := headers[jose.HeaderType]
+	typ, ok := headers[docjose.HeaderType]
 	if ok {
 		if err := checkTypHeader(typ); err != nil {
 			return err
 		}
 	}
 
-	cty, ok := headers[jose.HeaderContentType]
+	cty, ok := headers[docjose.HeaderContentType]
 	if ok && cty == TypeJWT {
 		return errors.New("nested JWT is not supported")
 	}
@@ -269,15 +269,15 @@ func checkTypHeader(typ interface{}) error {
 	return nil
 }
 
-type signatureVerifierFunc func(joseHeaders jose.Headers, payload, signingInput, signature []byte) error
+type signatureVerifierFunc func(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error
 
-func (s signatureVerifierFunc) Verify(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+func (s signatureVerifierFunc) Verify(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error {
 	return s(joseHeaders, payload, signingInput, signature)
 }
 
-var _ jose.SignatureVerifier = (signatureVerifierFunc)(nil)
+var _ docjose.SignatureVerifier = (signatureVerifierFunc)(nil)
 
-func verifyUnsecuredJWT(joseHeaders jose.Headers, _, _, signature []byte) error {
+func verifyUnsecuredJWT(joseHeaders docjose.Headers, _, _, signature []byte) error {
 	alg, ok := joseHeaders.Algorithm()
 	if !ok {
 		return errors.New("alg is not defined")
@@ -294,6 +294,6 @@ func verifyUnsecuredJWT(joseHeaders jose.Headers, _, _, signature []byte) error 
 	return nil
 }
 
-func UnsecuredJWTVerifier() jose.SignatureVerifier {
+func UnsecuredJWTVerifier() docjose.SignatureVerifier {
 	return signatureVerifierFunc(verifyUnsecuredJWT)
 }

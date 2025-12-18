@@ -3,8 +3,8 @@ package verifiable
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
-	"github.com/czh0526/aries-framework-go/component/models/jwt"
+	docjose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 )
 
@@ -22,13 +22,13 @@ func (s JwtSigner) Sign(data []byte) ([]byte, error) {
 	return s.signer.Sign(data)
 }
 
-func (s JwtSigner) Headers() jose.Headers {
+func (s JwtSigner) Headers() docjose.Headers {
 	return s.headers
 }
 
 func GetJWTSigner(signer Signer, algorithm string) *JwtSigner {
 	headers := map[string]interface{}{
-		jose.HeaderAlgorithm: algorithm,
+		docjose.HeaderAlgorithm: algorithm,
 	}
 
 	return &JwtSigner{
@@ -39,11 +39,11 @@ func GetJWTSigner(signer Signer, algorithm string) *JwtSigner {
 
 type noVerifier struct{}
 
-func (n noVerifier) Verify(joseHeaders jose.Headers, payload, signingInput, signature []byte) error {
+func (n noVerifier) Verify(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error {
 	return nil
 }
 
-var _ jose.SignatureVerifier = (*noVerifier)(nil)
+var _ docjose.SignatureVerifier = (*noVerifier)(nil)
 
 func marshalJWS(jwtClaims interface{}, signatureAlg JWSAlgorithm, signer Signer, keyID string) (string, error) {
 	algName, err := signatureAlg.Name()
@@ -52,10 +52,10 @@ func marshalJWS(jwtClaims interface{}, signatureAlg JWSAlgorithm, signer Signer,
 	}
 
 	headers := map[string]interface{}{
-		jose.HeaderKeyID: keyID,
+		docjose.HeaderKeyID: keyID,
 	}
 
-	token, err := jwt.NewSigned(jwtClaims, headers, GetJWTSigner(signer, algName))
+	token, err := modeljwt.NewSigned(jwtClaims, headers, GetJWTSigner(signer, algName))
 	if err != nil {
 		return "", err
 	}
@@ -63,18 +63,18 @@ func marshalJWS(jwtClaims interface{}, signatureAlg JWSAlgorithm, signer Signer,
 	return token.Serialize(false)
 }
 
-func unmarshalJWS(rawJwt string, checkProof bool, fetcher didsignjwt.PublicKeyFetcher, claims interface{}) (jose.Headers, error) {
-	var verifier jose.SignatureVerifier
+func unmarshalJWS(rawJwt string, checkProof bool, fetcher didsignjwt.PublicKeyFetcher, claims interface{}) (docjose.Headers, error) {
+	var verifier docjose.SignatureVerifier
 
 	if checkProof {
-		verifier = jwt.NewVerifier(jwt.KeyResolveFunc(fetcher))
+		verifier = modeljwt.NewVerifier(modeljwt.KeyResolveFunc(fetcher))
 	} else {
 		verifier = &noVerifier{}
 	}
 
-	jsonWebToken, claimsRaw, err := jwt.Parse(rawJwt,
-		jwt.WithSignatureVerifier(verifier),
-		jwt.WithIgnoreClaimsMapDecoding(true))
+	jsonWebToken, claimsRaw, err := modeljwt.Parse(rawJwt,
+		modeljwt.WithSignatureVerifier(verifier),
+		modeljwt.WithIgnoreClaimsMapDecoding(true))
 	if err != nil {
 		return nil, fmt.Errorf("parse JWT: %w", err)
 	}

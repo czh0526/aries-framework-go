@@ -89,8 +89,7 @@ func (s *SDJWTBuilderV2) ExtractCredentialClaims(vcClaims map[string]interface{}
 }
 
 func (s *SDJWTBuilderV2) GenerateSalt() (string, error) {
-	//TODO implement me
-	panic("implement me")
+	return generateSalt(s.defaultSaltSize)
 }
 
 var _ builder = (*SDJWTBuilderV2)(nil)

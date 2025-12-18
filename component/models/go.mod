@@ -5,12 +5,14 @@ go 1.23.9
 require (
 	github.com/btcsuite/btcd v0.22.3
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
-	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123140137-a11a60fb08e3
+	github.com/czh0526/aries-framework-go v0.0.0-20251216144914-6b4cedfa097f
+	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251208043106-351c7e6daee0
-	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
+	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/google/uuid v1.6.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/piprate/json-gold v0.5.0
 	github.com/stretchr/testify v1.10.0

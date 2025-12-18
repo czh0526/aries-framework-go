@@ -126,7 +126,6 @@ type JWSParseOpt func(*jwsParseOpts)
 
 type Signer interface {
 	Sign(data []byte) ([]byte, error)
-
 	Headers() Headers
 }
 

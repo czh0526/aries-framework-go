@@ -61,6 +61,14 @@ type CombinedFormatForIssuance struct {
 	Disclosures []string
 }
 
+func (cf *CombinedFormatForIssuance) Serialize() string {
+	presentation := cf.SDJWT
+	for _, disclosure := range cf.Disclosures {
+		presentation += CombinedFormatSeparator + disclosure
+	}
+	return presentation
+}
+
 type CombineFormatForPresentation struct {
 	SDJWT              string
 	Disclosures        []string
@@ -143,13 +151,13 @@ func GetSDAlg(claims map[string]interface{}) (string, error) {
 	if !ok {
 		obj, ok = GetKeyFromVC(SDAlgorithmKey, claims)
 		if !ok {
-			return "", fmt.Errorf("%s must be present in SD-JWT", SDAlgorithmKey)
+			return "", fmt.Errorf("`%s` must be present in SD-JWT", SDAlgorithmKey)
 		}
 	}
 
 	alg, ok = obj.(string)
 	if !ok {
-		return "", fmt.Errorf("%s must be pa string", SDAlgorithmKey)
+		return "", fmt.Errorf("`%s` must be pa string", SDAlgorithmKey)
 	}
 
 	return alg, nil
@@ -276,6 +284,23 @@ func stringArray(entry interface{}) ([]string, error) {
 	return stringSlice, nil
 }
 
+func GetCNF(claims map[string]interface{}) (map[string]interface{}, error) {
+	obj, ok := claims[CNFKey]
+	if !ok {
+		obj, ok = GetKeyFromVC(CNFKey, claims)
+		if !ok {
+			return nil, fmt.Errorf("`%s` must be present in SD-JWT", CNFKey)
+		}
+	}
+
+	cnf, ok := obj.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("`%s` must be an object", CNFKey)
+	}
+
+	return cnf, nil
+}
+
 type CombinedFormatForPresentation struct {
 	SDJWT              string
 	Disclosures        []string
@@ -295,4 +320,34 @@ func (cf *CombinedFormatForPresentation) Serialize() string {
 	presentation += cf.HolderVerification
 
 	return presentation
+}
+
+func GetDisclosedClaims(disclosureClaims []*DisclosureClaim,
+	claims map[string]interface{}) (map[string]interface{}, error) {
+	_, err := GetCryptoHashFromClaims(claims)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get crypto hash from claims: %w", err)
+	}
+
+	disclosureClaimsMap := make(map[string]*DisclosureClaim, len(disclosureClaims))
+	for _, d := range disclosureClaims {
+		disclosureClaimsMap[d.Digest] = d
+	}
+
+	recData := &recursiveData{
+		disclosures:          disclosureClaimsMap,
+		cleanupDigestsClaims: true,
+	}
+
+	output, err := discloseClaimValue(claims, recData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process disclosed claims: %w", err)
+	}
+
+	outputMapped, ok := output.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected output type")
+	}
+
+	return outputMapped, nil
 }
