@@ -1,7 +1,7 @@
 package holder
 
 import (
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	docjose "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	modeljwt "github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/go-jose/go-jose/v3/jwt"
 )
@@ -14,8 +14,8 @@ type BindingPayload struct {
 
 type BindingInfo struct {
 	Payload BindingPayload
-	Signer  jose.Signer
-	Headers jose.Headers
+	Signer  docjose.Signer
+	Headers docjose.Headers
 }
 
 func CreateHolderVerification(info *BindingInfo) (string, error) {
@@ -26,3 +26,11 @@ func CreateHolderVerification(info *BindingInfo) (string, error) {
 
 	return hbJWT.Serialize(false)
 }
+
+type NoopSignatureVerifier struct{}
+
+func (n NoopSignatureVerifier) Verify(joseHeaders docjose.Headers, payload, signingInput, signature []byte) error {
+	return nil
+}
+
+var _ docjose.SignatureVerifier = (*NoopSignatureVerifier)(nil)
