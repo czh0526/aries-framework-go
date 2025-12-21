@@ -61,6 +61,12 @@ type CombinedFormatForIssuance struct {
 	Disclosures []string
 }
 
+type CombineFormatForPresentation struct {
+	SDJWT              string
+	Disclosures        []string
+	HolderVerification string
+}
+
 func (cf *CombinedFormatForIssuance) Serialize() string {
 	presentation := cf.SDJWT
 	for _, disclosure := range cf.Disclosures {
@@ -69,10 +75,18 @@ func (cf *CombinedFormatForIssuance) Serialize() string {
 	return presentation
 }
 
-type CombineFormatForPresentation struct {
-	SDJWT              string
-	Disclosures        []string
-	HolderVerification string
+func (cfp *CombineFormatForPresentation) Serialize() string {
+	presentation := cfp.SDJWT
+	for _, disclosure := range cfp.Disclosures {
+		presentation += CombinedFormatSeparator + disclosure
+	}
+
+	if len(cfp.Disclosures) > 0 || cfp.HolderVerification != "" {
+		presentation += CombinedFormatSeparator
+	}
+	presentation += cfp.HolderVerification
+
+	return presentation
 }
 
 func ParseCombinedFormatForIssuance(combinedFormatForIssuance string) *CombinedFormatForIssuance {
@@ -186,31 +200,6 @@ func GetKeyFromVC(key string, claims map[string]interface{}) (interface{}, bool)
 	return obj, true
 }
 
-func GetDisclosureClaims(disclosures []string, hash crypto.Hash) ([]*DisclosureClaim, error) {
-	disclosureClaims, err := getDisclosureClaims(disclosures, hash)
-	if err != nil {
-		return nil, err
-	}
-
-	recData := &recursiveData{
-		disclosures:          disclosureClaims,
-		cleanupDigestsClaims: true,
-	}
-
-	for _, wrappedDisclosureClaim := range disclosureClaims {
-		if err = setDisclosureClaimValue(recData, wrappedDisclosureClaim); err != nil {
-			return nil, err
-		}
-	}
-
-	final := make([]*DisclosureClaim, 0, len(disclosureClaims))
-	for _, disclosureClaim := range recData.disclosures {
-		final = append(final, disclosureClaim)
-	}
-
-	return final, nil
-}
-
 func GetHash(hash crypto.Hash, value string) (string, error) {
 	if !hash.Available() {
 		return "", fmt.Errorf("hash function not available for: %d", hash)
@@ -320,6 +309,32 @@ func (cf *CombinedFormatForPresentation) Serialize() string {
 	presentation += cf.HolderVerification
 
 	return presentation
+}
+
+func GetDisclosureClaims(disclosures []string, hash crypto.Hash) ([]*DisclosureClaim, error) {
+	// 将 base64 字符串反解析成 DisclosureClaim 对象
+	disclosureClaims, err := getDisclosureClaims(disclosures, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	recData := &recursiveData{
+		disclosures:          disclosureClaims,
+		cleanupDigestsClaims: true,
+	}
+
+	for _, wrappedDisclosureClaim := range disclosureClaims {
+		if err = setDisclosureClaimValue(recData, wrappedDisclosureClaim); err != nil {
+			return nil, err
+		}
+	}
+
+	final := make([]*DisclosureClaim, 0, len(disclosureClaims))
+	for _, disclosureClaim := range recData.disclosures {
+		final = append(final, disclosureClaim)
+	}
+
+	return final, nil
 }
 
 func GetDisclosedClaims(disclosureClaims []*DisclosureClaim,

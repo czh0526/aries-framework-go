@@ -43,6 +43,12 @@ func WithExpectedTypeHeader(typ string) ParseOpt {
 	}
 }
 
+func WithLeewayForClaimsValidation(duration time.Duration) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.leewayForClaimsValidation = duration
+	}
+}
+
 func Parse(combinedFormatForPresentation string, opts ...ParseOpt) (map[string]interface{}, error) {
 	defaultSigninglgorithm := []string{"EdDSA", "RS256"}
 	pOpts := &parseOpts{
@@ -201,7 +207,7 @@ func getSignatureVerifier(claims map[string]interface{}) (docjose.SignatureVerif
 }
 
 func getSignatureVerifierFromCNF(cnf map[string]interface{}) (docjose.SignatureVerifier, error) {
-	jwkObj, ok := cnf["docjwk"]
+	jwkObj, ok := cnf["jwk"]
 	if !ok {
 		return nil, fmt.Errorf("jwt must be present in cnf")
 	}

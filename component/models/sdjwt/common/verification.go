@@ -335,6 +335,7 @@ func VerifyDisclosuresInSDJWT(
 		return err
 	}
 
+	// 把 base64字符串反解析成 DisclosureClaim 对象
 	parsedDisclosureClaims, err := getDisclosureClaims(disclosures, cryptoHash)
 	if err != nil {
 		return err

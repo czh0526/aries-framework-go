@@ -112,6 +112,12 @@ func WithExpiry(expiry *josejwt.NumericDate) NewOpt {
 	}
 }
 
+func WithHolderPublicKey(jwk *jwk.JWK) NewOpt {
+	return func(opts *newOpts) {
+		opts.HolderPublicKey = jwk
+	}
+}
+
 type SelectiveDisclosureJWT struct {
 	SignedJWT   *modeljwt.JSONWebToken
 	Disclosures []string
