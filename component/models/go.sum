@@ -1,5 +1,10 @@
 github.com/IBM/mathlib v0.0.2 h1:HXXgHp1vUG6hG65ks8ZSgSsIKGlMzZFNxIOXoUnCN54=
 github.com/IBM/mathlib v0.0.2/go.mod h1:bwdPq6aFVeUiiLNwG8sIgN4yIB3yN8Nd9RRRe70XHkY=
+github.com/PaesslerAG/gval v1.0.0 h1:GEKnRwkWDdf9dOmKcNrar9EA1bz1z9DqPIO1+iLzhd8=
+github.com/PaesslerAG/gval v1.0.0/go.mod h1:y/nm5yEyTeX6av0OfKJNp9rBNj2XrGhAf5+v24IBN1I=
+github.com/PaesslerAG/jsonpath v0.1.0/go.mod h1:4BzmtoM/PI8fPO4aQGIusjGxGir2BzcV0grWtFzq1Y8=
+github.com/PaesslerAG/jsonpath v0.1.1 h1:c1/AToHQMVsduPAa4Vh6xp2U0evy4t8SWp8imEsylIk=
+github.com/PaesslerAG/jsonpath v0.1.1/go.mod h1:lVboNxFGal/VwW6d9JzIy56bUsYAP6tH/x80vjnCseY=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/btcsuite/btcd v0.20.1-beta/go.mod h1:wVuoA8VJLEcwgqHBwHmzLRazpKxTv13Px/pDuV7OomQ=
 github.com/btcsuite/btcd v0.22.3 h1:kYNaWFvOw6xvqP0vR20RP1Zq1DVMBxEO8QN5d1/EfNg=
@@ -19,8 +24,6 @@ github.com/consensys/bavard v0.1.13 h1:oLhMLOFGTLdlda/kma4VOJazblc7IM5y5QPd2A/Yj
 github.com/consensys/bavard v0.1.13/go.mod h1:9ItSMtA/dXMAiL7BG6bqW2m3NdSEObYWoH223nGHukI=
 github.com/consensys/gnark-crypto v0.9.1 h1:mru55qKdWl3E035hAoh1jj9d7hVnYY5pfb6tmovSmII=
 github.com/consensys/gnark-crypto v0.9.1/go.mod h1:a2DQL4+5ywF6safEeZFEPGRiiGbjzGFRUN2sg06VuU4=
-github.com/czh0526/aries-framework-go v0.0.0-20251216144914-6b4cedfa097f h1:OdyUD0D8vzHBf1W/K5KGbDJKqTvp5zrvatGuOzZXrOM=
-github.com/czh0526/aries-framework-go v0.0.0-20251216144914-6b4cedfa097f/go.mod h1:oUbZLYhbzhKTHpnb9DMHgA7WK1ChibpPyHGxL2XikJ8=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c h1:dL8qGmgPcCUHNqPrA639z5skovRN+ZU17F7R2oiwltY=
 github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c/go.mod h1:2YjcrX4BqVSy3Sq92jd93SlQWh6c8tEJp1uVuItwGdg=
 github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976 h1:Si39jcetNKB8P27VUB5hXsL6g7MzOBZgv1BtopI3gLQ=

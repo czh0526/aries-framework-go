@@ -31,9 +31,13 @@ func (s *SDJWTBuilderV5) CreateDisclosuresAndDigests(
 	return s.createDisclosuresAndDigestsInternal(path, claims, opts, false)
 }
 
-func (s *SDJWTBuilderV5) ExtractCredentialClaims(vcClaims map[string]interface{}) (map[string]interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+func (s *SDJWTBuilderV5) ExtractCredentialClaims(vc map[string]interface{}) (map[string]interface{}, error) {
+	vcClaims, ok := vc[vcKey].(map[string]interface{})
+	if ok {
+		return vcClaims, nil
+	}
+
+	return vc, nil
 }
 
 func (s *SDJWTBuilderV5) GenerateSalt() (string, error) {
@@ -47,7 +51,9 @@ func (s *SDJWTBuilderV5) createDisclosuresAndDigestsInternal(
 	claims map[string]interface{},
 	opts *newOpts,
 	ignorePrimitives bool) ([]*DisclosureEntity, map[string]interface{}, error) {
+	// 构建一个map, 存储DisclosureEntity
 	digestsMap := map[string]interface{}{}
+	// 每一层深度，随机的Digest
 	finalSDDigest, err := createDecoyDisclosures(opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create decoy disclosures: %w", err)

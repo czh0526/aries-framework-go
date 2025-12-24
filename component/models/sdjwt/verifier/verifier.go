@@ -49,6 +49,24 @@ func WithLeewayForClaimsValidation(duration time.Duration) ParseOpt {
 	}
 }
 
+func WithHolderVerificationRequired(flag bool) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.holderVerificationRequired = flag
+	}
+}
+
+func WithExpectedAudienceForHolderVerification(audience string) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.expectedAudienceForHolderVerification = audience
+	}
+}
+
+func WithExpectedNonceForHolderVerification(nonce string) ParseOpt {
+	return func(opts *parseOpts) {
+		opts.expectedNonceForHolderVerification = nonce
+	}
+}
+
 func Parse(combinedFormatForPresentation string, opts ...ParseOpt) (map[string]interface{}, error) {
 	defaultSigninglgorithm := []string{"EdDSA", "RS256"}
 	pOpts := &parseOpts{

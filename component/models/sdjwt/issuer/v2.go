@@ -84,8 +84,12 @@ func (s *SDJWTBuilderV2) CreateDisclosuresAndDigests(
 }
 
 func (s *SDJWTBuilderV2) ExtractCredentialClaims(vcClaims map[string]interface{}) (map[string]interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	vc, ok := vcClaims[vcKey].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid vc claims")
+	}
+
+	return vc, nil
 }
 
 func (s *SDJWTBuilderV2) GenerateSalt() (string, error) {

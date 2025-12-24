@@ -34,6 +34,8 @@ type Claim struct {
 }
 
 func Parse(combinedFormatForIssuance string, opts ...ParseOpt) ([]*Claim, error) {
+	// sigVerifier 不能为空，
+	// 如果不做校验，用默认的NoopSignatureVerifier
 	pOpts := &parseOpts{
 		sigVerifier: &NoopSignatureVerifier{},
 	}

@@ -3,9 +3,9 @@ module github.com/czh0526/aries-framework-go/component/models
 go 1.23.9
 
 require (
+	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/btcsuite/btcd v0.22.3
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
-	github.com/czh0526/aries-framework-go v0.0.0-20251216144914-6b4cedfa097f
 	github.com/czh0526/aries-framework-go/component/kmscrypto v0.0.0-20251123150327-e865d0a2866a
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251208043106-351c7e6daee0
@@ -21,6 +21,7 @@ require (
 
 require (
 	github.com/IBM/mathlib v0.0.2 // indirect
+	github.com/PaesslerAG/gval v1.0.0 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.9.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

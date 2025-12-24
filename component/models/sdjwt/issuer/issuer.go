@@ -118,6 +118,12 @@ func WithHolderPublicKey(jwk *jwk.JWK) NewOpt {
 	}
 }
 
+func WithSaltFunc(f func() (string, error)) NewOpt {
+	return func(opts *newOpts) {
+		opts.getSalt = f
+	}
+}
+
 type SelectiveDisclosureJWT struct {
 	SignedJWT   *modeljwt.JSONWebToken
 	Disclosures []string
@@ -197,6 +203,7 @@ func New(issuer string, claims interface{}, headers jose.Headers,
 		return nil, fmt.Errorf("convert payload to map: %w", err)
 	}
 
+	// 递归检查 Key("_sd") 是否存在 claimsMap 中
 	found := common.KeyExistsInMap(common.SDKey, claimsMap)
 	if found {
 		return nil, fmt.Errorf("key `%s` cannot be present in the claims", common.SDKey)
@@ -208,7 +215,7 @@ func New(issuer string, claims interface{}, headers jose.Headers,
 		nOpts.getSalt = sdJWTBuilder.GenerateSalt
 	}
 
-	// 构造 DisclosureEntities
+	// 构造 DisclosureEntities，以及每个 DisclosureEntity 的 digest
 	disclosures, digests, err := sdJWTBuilder.CreateDisclosuresAndDigests("", claimsMap, nOpts)
 	if err != nil {
 		return nil, err
@@ -253,6 +260,10 @@ func (j *SelectiveDisclosureJWT) Serialize(detached bool) (string, error) {
 	}
 
 	return cf.Serialize(), nil
+}
+
+func (j *SelectiveDisclosureJWT) DecodeClaims(c interface{}) error {
+	return j.SignedJWT.DecodeClaims(c)
 }
 
 type payload struct {
