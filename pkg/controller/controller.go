@@ -22,6 +22,15 @@ type allOpts struct {
 
 type Opt func(opts *allOpts)
 
+type handlerProvider interface {
+	GetRESTHandlers() []rest.Handler
+}
+
+var _ handlerProvider = (*verifiablerest.Operation)(nil)
+var _ handlerProvider = (*vdrrest.Operation)(nil)
+var _ handlerProvider = (*kmsrest.Operation)(nil)
+var _ handlerProvider = (*vcwalletrest.Operation)(nil)
+
 func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) {
 	restAPIOpts := &allOpts{
 		httpClient: http.DefaultClient,

@@ -46,5 +46,7 @@ require (
 
 replace (
 	github.com/czh0526/aries-framework-go/component/kmscrypto => ../kmscrypto
+	github.com/czh0526/aries-framework-go/component/log => ../log
 	github.com/czh0526/aries-framework-go/component/storageutil => ../storageutil
+	github.com/czh0526/aries-framework-go/spi => ../../spi
 )

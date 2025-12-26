@@ -281,6 +281,57 @@ func (doc *Doc) JSONBytes() ([]byte, error) {
 	return byteDoc, nil
 }
 
+func (doc *Doc) VerificationMethods(
+	customVerificationRelationships ...VerificationRelationship) map[VerificationRelationship][]Verification {
+	all := len(customVerificationRelationships) == 0
+
+	includeRelationship := func(relationship VerificationRelationship) bool {
+		if all {
+			return true
+		}
+
+		for _, r := range customVerificationRelationships {
+			if r == relationship {
+				return true
+			}
+		}
+		return false
+	}
+
+	verificationMethods := make(map[VerificationRelationship][]Verification)
+
+	if len(doc.Authentication) > 0 && includeRelationship(Authentication) {
+		verificationMethods[Authentication] = doc.Authentication
+	}
+	if len(doc.AssertionMethod) > 0 && includeRelationship(AssertionMethod) {
+		verificationMethods[AssertionMethod] = doc.AssertionMethod
+	}
+	if len(doc.CapabilityDelegation) > 0 && includeRelationship(CapabilityDelegation) {
+		verificationMethods[CapabilityDelegation] = doc.CapabilityDelegation
+	}
+	if len(doc.CapabilityInvocation) > 0 && includeRelationship(CapabilityInvocation) {
+		verificationMethods[CapabilityInvocation] = doc.CapabilityInvocation
+	}
+	if len(doc.KeyAgreement) > 0 && includeRelationship(KeyAgreement) {
+		verificationMethods[KeyAgreement] = doc.KeyAgreement
+	}
+
+	if len(doc.VerificationMethod) > 0 && includeRelationship(VerificationRelationshipGeneral) {
+		generalVerificationMethods := make([]Verification, len(doc.VerificationMethod))
+
+		for i := range doc.VerificationMethod {
+			generalVerificationMethods[i] = Verification{
+				VerificationMethod: doc.VerificationMethod[i],
+				Relationship:       VerificationRelationshipGeneral,
+				Embedded:           true,
+			}
+		}
+		verificationMethods[VerificationRelationshipGeneral] = generalVerificationMethods
+	}
+
+	return verificationMethods
+}
+
 func (docResolution *DocResolution) JSONBytes() ([]byte, error) {
 
 	didBytes, err := docResolution.DIDDocument.JSONBytes()

@@ -4,7 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
+	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
+	sigapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
+	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
+	"strings"
 )
 
 type JWSAlgorithm int
@@ -163,4 +168,44 @@ func safeStringValue(v interface{}) string {
 	}
 
 	return v.(string)
+}
+
+type VDRKeyResolver struct {
+	vdr didResolver
+}
+
+func (v *VDRKeyResolver) PublicKeyFetcher() didsignjwt.PublicKeyFetcher {
+	return v.resolvePublicKey
+}
+
+func (v *VDRKeyResolver) resolvePublicKey(issuerDID, keyID string) (*sigapi.PublicKey, error) {
+	docResolution, err := v.vdr.Resolve(issuerDID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, verifications := range docResolution.DIDDocument.VerificationMethods() {
+		for _, verification := range verifications {
+			if strings.Contains(verification.VerificationMethod.ID, keyID) &&
+				verification.Relationship != didmodel.KeyAgreement {
+				return &sigapi.PublicKey{
+					Type:  verification.VerificationMethod.Type,
+					Value: verification.VerificationMethod.Value,
+					JWK:   verification.VerificationMethod.JSONWebKey(),
+				}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("public key with KID %s is not found for DID %s", keyID, issuerDID)
+}
+
+type didResolver interface {
+	Resolve(did string, opts ...spivdr.DIDMethodOption) (didmodel.DocResolution, error)
+}
+
+func NewVDRKeyResolver(vdr didResolver) *VDRKeyResolver {
+	return &VDRKeyResolver{
+		vdr: vdr,
+	}
 }

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
-	"github.com/czh0526/aries-framework-go/component/models/did"
+	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
@@ -20,7 +20,7 @@ const (
 )
 
 type vdrResolver interface {
-	Resolve(did string, opts ...spivdr.DIDMethodOption) (*did.DocResolution, error)
+	Resolve(did string, opts ...spivdr.DIDMethodOption) (*didmodel.DocResolution, error)
 }
 
 type DIDDocResolver struct {
@@ -64,7 +64,7 @@ func (d *DIDDocResolver) Resolve(kid string) (*spicrypto.PublicKey, error) {
 	return pubKey, nil
 }
 
-func extractKey(ka *did.Verification) (*spicrypto.PublicKey, error) {
+func extractKey(ka *didmodel.Verification) (*spicrypto.PublicKey, error) {
 	var (
 		pubKey *spicrypto.PublicKey
 		err    error
@@ -89,7 +89,7 @@ func extractKey(ka *did.Verification) (*spicrypto.PublicKey, error) {
 	return pubKey, nil
 }
 
-func buildX25519Key(ka *did.Verification) (*spicrypto.PublicKey, error) {
+func buildX25519Key(ka *didmodel.Verification) (*spicrypto.PublicKey, error) {
 	pubKey := &spicrypto.PublicKey{
 		X:     ka.VerificationMethod.Value,
 		Curve: "X25519",
@@ -110,7 +110,7 @@ func buildX25519Key(ka *did.Verification) (*spicrypto.PublicKey, error) {
 	return pubKey, nil
 }
 
-func buildJWKKey(ka *did.Verification) (*spicrypto.PublicKey, error) {
+func buildJWKKey(ka *didmodel.Verification) (*spicrypto.PublicKey, error) {
 	var (
 		x  []byte
 		y  []byte
