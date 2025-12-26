@@ -866,6 +866,20 @@ type credentialOpts struct {
 	jsonldCredentialOpts
 }
 
+type CredentialOpt func(opts *credentialOpts)
+
+func WithJSONLDDocumentLoader(documentLoader jsonld.DocumentLoader) CredentialOpt {
+	return func(opts *credentialOpts) {
+		opts.jsonldDocumentLoader = documentLoader
+	}
+}
+
+func WithPublicKeyFetcher(publicKeyFetcher didsignjwt.PublicKeyFetcher) CredentialOpt {
+	return func(opts *credentialOpts) {
+		opts.publicKeyFetcher = publicKeyFetcher
+	}
+}
+
 type CredentialSchemaLoader struct {
 	schemaDownloadClient *http.Client
 	cache                SchemaCache
@@ -881,14 +895,6 @@ type jsonldCredentialOpts struct {
 	jsonldDocumentLoader jsonld.DocumentLoader
 	externalContext      []string
 	jsonldOnlyValidRDF   bool
-}
-
-type CredentialOpt func(opts *credentialOpts)
-
-func WithJSONLDDocumentLoader(documentLoader jsonld.DocumentLoader) CredentialOpt {
-	return func(opts *credentialOpts) {
-		opts.jsonldDocumentLoader = documentLoader
-	}
 }
 
 func isJWTVC(vcStr string) (bool, string, []string, string) {

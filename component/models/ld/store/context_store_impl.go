@@ -15,17 +15,17 @@ type ContextStoreImpl struct {
 	store spistorage.Store
 }
 
-func (c ContextStoreImpl) Get(u string) (jsonld.RemoteDocument, error) {
+func (c *ContextStoreImpl) Get(u string) (*jsonld.RemoteDocument, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ContextStoreImpl) Put(u string, rd *jsonld.RemoteDocument) error {
+func (c *ContextStoreImpl) Put(u string, rd *jsonld.RemoteDocument) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (c ContextStoreImpl) Import(documents []ldcontext.Document) error {
+func (c *ContextStoreImpl) Import(documents []ldcontext.Document) error {
 	hashes, err := computeContextHashes(c.store)
 	if err != nil {
 		return err
@@ -53,7 +53,7 @@ func (c ContextStoreImpl) Import(documents []ldcontext.Document) error {
 	return nil
 }
 
-func (c ContextStoreImpl) Delete(documents []ldcontext.Document) error {
+func (c *ContextStoreImpl) Delete(documents []ldcontext.Document) error {
 	//TODO implement me
 	panic("implement me")
 }

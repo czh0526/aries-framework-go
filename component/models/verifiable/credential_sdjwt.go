@@ -13,8 +13,8 @@ import (
 
 type marshalDisclosureOpts struct {
 	includeAllDisclosures bool
-	disclosureIfAvailable []string
-	disclosureRequired    []string
+	discloseIfAvailable   []string
+	discloseRequired      []string
 	holderBinding         *holder.BindingInfo
 	signer                jose.Signer
 	signingKeyID          string
@@ -43,7 +43,7 @@ func (vc *Credential) MarshalWithDisclosure(opts ...MarshalDisclosureOption) (st
 		opt(options)
 	}
 
-	if options.includeAllDisclosures && (len(options.disclosureIfAvailable) > 0 || len(options.disclosureRequired) > 0) {
+	if options.includeAllDisclosures && (len(options.discloseIfAvailable) > 0 || len(options.discloseRequired) > 0) {
 		return "", errors.New("incompatible options provided")
 	}
 
@@ -59,7 +59,7 @@ func (vc *Credential) MarshalWithDisclosure(opts ...MarshalDisclosureOption) (st
 }
 
 func filterSDJWTVC(vc *Credential, options *marshalDisclosureOpts) (string, error) {
-	disclosureCodes, err := filterDisclosureCodes(vc.SDJWTDisclosures, options)
+	disclosureCodes, err := filteredDisclosureCodes(vc.SDJWTDisclosures, options)
 	if err != nil {
 		return "", err
 	}
@@ -98,6 +98,39 @@ func MakeSDJWTWithVersion(version common.SDJWTVersion) MakeSDJWTOption {
 
 func createSDJWTPresentation(vc *Credential, options *marshalDisclosureOpts) (string, error) {
 	issued, err := makeSDJWT(vc, options.signer, options.signingKeyID, MakeSDJWTWithVersion(options.sdjwtVersion))
+	if err != nil {
+		return "", fmt.Errorf("creating SD-JWT from Credential: %w", err)
+	}
+
+	alg, _ := common.GetCryptoHashFromClaims(issued.SignedJWT.Payload)
+
+	disclosureClaims, err := common.GetDisclosureClaims(issued.Disclosures, alg)
+	if err != nil {
+		return "", fmt.Errorf("parsing disclosure claims from vc sdjwt: %w", err)
+	}
+
+	disclosureCodes, err := filteredDisclosureCodes(disclosureClaims, options)
+	if err != nil {
+		return "", fmt.Errorf("filtering disclosure codes: %w", err)
+	}
+
+	var presOpts []holder.Option
+
+	if options.holderBinding != nil {
+		presOpts = append(presOpts, holder.WithHolderVerification(options.holderBinding))
+	}
+
+	issuedSerialized, err := issued.Serialize(false)
+	if err != nil {
+		return "", fmt.Errorf("serializing SD-JWT for presentation: %w", err)
+	}
+
+	combinedSDJWT, err := holder.CreatePresentation(issuedSerialized, disclosureCodes, presOpts...)
+	if err != nil {
+		return "", fmt.Errorf("creating SD-JWT presentation failed: %w", err)
+	}
+
+	return combinedSDJWT, nil
 }
 
 func makeSDJWT(vc *Credential, signer jose.Signer, signingKeyID string,
@@ -176,4 +209,77 @@ func makeSDJWT(vc *Credential, signer jose.Signer, signingKeyID string,
 	}
 
 	return sdjwt, nil
+}
+
+func filteredDisclosureCodes(
+	availableDisclosures []*common.DisclosureClaim,
+	options *marshalDisclosureOpts,
+) ([]string, error) {
+	var (
+		useDisclosures  []*common.DisclosureClaim
+		err             error
+		disclosureCodes []string
+	)
+
+	if options.includeAllDisclosures {
+		useDisclosures = availableDisclosures
+	} else {
+		useDisclosures, err = filterDisclosures(availableDisclosures,
+			options.discloseIfAvailable, options.discloseRequired)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, disclosure := range useDisclosures {
+		disclosureCodes = append(disclosureCodes, disclosure.Disclosure)
+	}
+
+	return disclosureCodes, nil
+}
+
+func filterDisclosures(
+	disclosures []*common.DisclosureClaim,
+	ifAvailable, required []string,
+) ([]*common.DisclosureClaim, error) {
+	ifAvailMap := map[string]*common.DisclosureClaim{}
+	reqMap := map[string]*common.DisclosureClaim{}
+
+	for _, name := range ifAvailable {
+		ifAvailMap[name] = nil
+	}
+
+	for _, name := range required {
+		reqMap[name] = nil
+
+		delete(ifAvailMap, name) // avoid listing a disclosure twice, if it's in both lists
+	}
+
+	for _, disclosure := range disclosures {
+		if _, ok := ifAvailMap[disclosure.Name]; ok {
+			ifAvailMap[disclosure.Name] = disclosure
+		}
+
+		if _, ok := reqMap[disclosure.Name]; ok {
+			reqMap[disclosure.Name] = disclosure
+		}
+	}
+
+	var out []*common.DisclosureClaim
+
+	for _, claim := range ifAvailMap {
+		if claim != nil {
+			out = append(out, claim)
+		}
+	}
+
+	for _, claim := range reqMap {
+		if claim == nil {
+			return nil, fmt.Errorf("disclosure list missing required claim")
+		}
+
+		out = append(out, claim)
+	}
+
+	return out, nil
 }

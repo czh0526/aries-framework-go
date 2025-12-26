@@ -201,7 +201,7 @@ func (v *VDRKeyResolver) resolvePublicKey(issuerDID, keyID string) (*sigapi.Publ
 }
 
 type didResolver interface {
-	Resolve(did string, opts ...spivdr.DIDMethodOption) (didmodel.DocResolution, error)
+	Resolve(did string, opts ...spivdr.DIDMethodOption) (*didmodel.DocResolution, error)
 }
 
 func NewVDRKeyResolver(vdr didResolver) *VDRKeyResolver {

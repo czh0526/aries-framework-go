@@ -53,6 +53,10 @@ type Context struct {
 	didRotator                 *middleware.DIDCommMessageMiddleware
 }
 
+func (c *Context) JSONLDDocumentLoader() jsonld.DocumentLoader {
+	return c.documentLoader
+}
+
 type inboundHandler struct {
 	handlers []dispatcher.ProtocolService
 }

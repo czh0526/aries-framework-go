@@ -1,12 +1,14 @@
 package verifiable
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/models/verifiable"
 	"github.com/czh0526/aries-framework-go/pkg/store/verifiable/internal"
 	pstore_verifiable "github.com/czh0526/aries-framework-go/provider/verifiable"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
+	"github.com/google/uuid"
 	"github.com/piprate/json-gold/ld"
 )
 
@@ -68,27 +70,36 @@ func (s *StoreImplementation) SaveCredential(name string, vc *verifiable.Credent
 		return fmt.Errorf("marshal credential: %w", err)
 	}
 
-	record := &internal.Record{
-		Name:      name,
+	id = vc.ID
+	if id == "" {
+		id = uuid.New().String()
+	}
+
+	if e := s.store.Put(id, vcBytes); e != nil {
+		return fmt.Errorf("failed to put vc: %w", e)
+	}
+
+	o := &options{}
+
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	recordBytes, err := json.Marshal(&Record{
 		ID:        id,
+		Name:      name,
 		Context:   vc.Context,
 		Type:      vc.Types,
-		SubjectID: vc.Subject.ID,
-		MyDID:     opts[0].MyDID,
-		TheirDID:  opts[0].TheirDID,
-	}
-
-	err = s.store.Put(id, vcBytes, spistorage.Tag{Name: internal.CredentialNameKey, Value: name})
+		MyDID:     o.MyDID,
+		TheirDID:  o.TheirDID,
+		SubjectID: getVCSubjectID(vc),
+	})
 	if err != nil {
-		return fmt.Errorf("save credential: %w", err)
+		return fmt.Errorf("failed to marshal credential record: %w", err)
 	}
 
-	err = s.store.Put(name, record, spistorage.Tag{Name: internal.CredentialNameKey, Value: name})
-	if err != nil {
-		return fmt.Errorf("save credential record: %w", err)
-	}
-
-	return nil
+	return s.store.Put(internal.CredentialNameDataKey(name), recordBytes,
+		spistorage.Tag{Name: internal.CredentialNameKey})
 }
 
 func (s StoreImplementation) SavePresentation(name string, vp *verifiable.Presentation, opts ...Opt) error {
@@ -156,4 +167,12 @@ func New(ctx pstore_verifiable.Provider) (*StoreImplementation, error) {
 		store:          store,
 		documentLoader: ctx.JSONLDDocumentLoader(),
 	}, nil
+}
+
+func getVCSubjectID(vc *verifiable.Credential) string {
+	if subjectID, err := verifiable.SubjectID(vc.Subject); err == nil {
+		return subjectID
+	}
+
+	return ""
 }

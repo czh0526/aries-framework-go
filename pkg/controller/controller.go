@@ -29,7 +29,8 @@ type handlerProvider interface {
 var _ handlerProvider = (*verifiablerest.Operation)(nil)
 var _ handlerProvider = (*vdrrest.Operation)(nil)
 var _ handlerProvider = (*kmsrest.Operation)(nil)
-var _ handlerProvider = (*vcwalletrest.Operation)(nil)
+
+//var _ handlerProvider = (*vcwalletrest.Operation)(nil)
 
 func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) {
 	restAPIOpts := &allOpts{
