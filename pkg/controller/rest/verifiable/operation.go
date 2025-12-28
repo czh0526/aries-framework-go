@@ -26,7 +26,7 @@ const (
 	GetCredentialPath       = verifiableCredentialPath + "/{id}"
 	GetCredentialByNamePath = verifiableCredentialPath + "/name/{name}"
 	GetCredentialsPath      = VerifiableOperationID + "/credentials"
-	SignCredentialsPath     = verifiableCredentialPath + "/sign"
+	SignCredentialsPath     = VerifiableOperationID + "/signcredential"
 )
 
 type provider interface {
