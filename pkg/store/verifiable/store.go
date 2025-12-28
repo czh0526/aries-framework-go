@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/models/verifiable"
+	"github.com/czh0526/aries-framework-go/component/log"
+	verifiablemodel "github.com/czh0526/aries-framework-go/component/models/verifiable"
 	"github.com/czh0526/aries-framework-go/pkg/store/verifiable/internal"
 	pstore_verifiable "github.com/czh0526/aries-framework-go/provider/verifiable"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
@@ -13,6 +14,8 @@ import (
 )
 
 const NameSpace = "verifiable"
+
+var logger = log.New("aries-framework/store/verifiable")
 
 type Opt func(o *options)
 
@@ -34,10 +37,10 @@ func WithTheirDID(theirDID string) Opt {
 }
 
 type Store interface {
-	SaveCredential(name string, vc *verifiable.Credential, opts ...Opt) error
-	SavePresentation(name string, vp *verifiable.Presentation, opts ...Opt) error
-	GetCredential(id string) (*verifiable.Credential, error)
-	GetPresentation(id string) (*verifiable.Presentation, error)
+	SaveCredential(name string, vc *verifiablemodel.Credential, opts ...Opt) error
+	SavePresentation(name string, vp *verifiablemodel.Presentation, opts ...Opt) error
+	GetCredential(id string) (*verifiablemodel.Credential, error)
+	GetPresentation(id string) (*verifiablemodel.Presentation, error)
 	GetCredentialIDByName(name string) (string, error)
 	GetPresentationIDByName(name string) (string, error)
 	GetCredentials() ([]*Record, error)
@@ -51,7 +54,7 @@ type StoreImplementation struct {
 	documentLoader ld.DocumentLoader
 }
 
-func (s *StoreImplementation) SaveCredential(name string, vc *verifiable.Credential, opts ...Opt) error {
+func (s *StoreImplementation) SaveCredential(name string, vc *verifiablemodel.Credential, opts ...Opt) error {
 	if name == "" {
 		return errors.New("credential name is mandatory")
 	}
@@ -102,24 +105,45 @@ func (s *StoreImplementation) SaveCredential(name string, vc *verifiable.Credent
 		spistorage.Tag{Name: internal.CredentialNameKey})
 }
 
-func (s StoreImplementation) SavePresentation(name string, vp *verifiable.Presentation, opts ...Opt) error {
+func (s StoreImplementation) SavePresentation(name string, vp *verifiablemodel.Presentation, opts ...Opt) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s StoreImplementation) GetCredential(id string) (*verifiable.Credential, error) {
-	//TODO implement me
-	panic("implement me")
+func (s StoreImplementation) GetCredential(id string) (*verifiablemodel.Credential, error) {
+	vcBytes, err := s.store.Get(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get vc: %w", err)
+	}
+
+	vc, err := verifiablemodel.ParseCredential(vcBytes,
+		verifiablemodel.WithDisabledProofCheck(),
+		verifiablemodel.WithJSONLDDocumentLoader(s.documentLoader))
+	if err != nil {
+		return nil, fmt.Errorf("parse credential vc: %w", err)
+	}
+
+	return vc, nil
 }
 
-func (s StoreImplementation) GetPresentation(id string) (*verifiable.Presentation, error) {
+func (s StoreImplementation) GetPresentation(id string) (*verifiablemodel.Presentation, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
 func (s StoreImplementation) GetCredentialIDByName(name string) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	recordBytes, err := s.store.Get(internal.CredentialNameDataKey(name))
+	if err != nil {
+		return "", fmt.Errorf("failed to get credential id based on name: %w", err)
+	}
+
+	var r Record
+	err = json.Unmarshal(recordBytes, &r)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal record: %w", err)
+	}
+
+	return r.ID, nil
 }
 
 func (s StoreImplementation) GetPresentationIDByName(name string) (string, error) {
@@ -128,8 +152,7 @@ func (s StoreImplementation) GetPresentationIDByName(name string) (string, error
 }
 
 func (s StoreImplementation) GetCredentials() ([]*Record, error) {
-	//TODO implement me
-	panic("implement me")
+	return s.getAllRecords(internal.CredentialNameDataKey(""))
 }
 
 func (s StoreImplementation) GetPresentations() ([]*Record, error) {
@@ -169,8 +192,52 @@ func New(ctx pstore_verifiable.Provider) (*StoreImplementation, error) {
 	}, nil
 }
 
-func getVCSubjectID(vc *verifiable.Credential) string {
-	if subjectID, err := verifiable.SubjectID(vc.Subject); err == nil {
+func (s *StoreImplementation) getAllRecords(searchKey string) ([]*Record, error) {
+	iter, err := s.store.Query(searchKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query store: %w", err)
+	}
+
+	defer func() {
+		errClose := iter.Close()
+		if errClose != nil {
+			logger.Errorf("failed to close iterator: %w", errClose)
+		}
+	}()
+
+	var records []*Record
+
+	more, err := iter.Next()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next set of data from iterator")
+	}
+
+	for more {
+		var r *Record
+
+		value, err := iter.Value()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get value from iterator: %w", err)
+		}
+
+		err = json.Unmarshal(value, &r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal record: %w", err)
+		}
+
+		records = append(records, r)
+
+		more, err = iter.Next()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get next set of data from iterator: %w", err)
+		}
+	}
+
+	return records, nil
+}
+
+func getVCSubjectID(vc *verifiablemodel.Credential) string {
+	if subjectID, err := verifiablemodel.SubjectID(vc.Subject); err == nil {
 		return subjectID
 	}
 

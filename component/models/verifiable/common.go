@@ -9,6 +9,7 @@ import (
 	sigapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spivdr "github.com/czh0526/aries-framework-go/spi/vdr"
+	"github.com/xeipuuv/gojsonschema"
 	"strings"
 )
 
@@ -168,6 +169,15 @@ func safeStringValue(v interface{}) string {
 	}
 
 	return v.(string)
+}
+
+func describeSchemaValidationError(result *gojsonschema.Result, what string) string {
+	errMsg := what + " is not valid:\n"
+	for _, desc := range result.Errors() {
+		errMsg += fmt.Sprintf("- %s\n", desc)
+	}
+
+	return errMsg
 }
 
 type VDRKeyResolver struct {

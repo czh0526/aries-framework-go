@@ -6,17 +6,32 @@ import (
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
+	"github.com/czh0526/aries-framework-go/component/log"
 	"github.com/czh0526/aries-framework-go/component/models/jwt"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
+	ldvalidator "github.com/czh0526/aries-framework-go/component/models/ld/validator"
 	"github.com/czh0526/aries-framework-go/component/models/sdjwt/common"
 	sigapi "github.com/czh0526/aries-framework-go/component/models/signature/api"
 	jsonutil "github.com/czh0526/aries-framework-go/component/models/util/json"
 	timeutil "github.com/czh0526/aries-framework-go/component/models/util/time"
 	jsonld "github.com/piprate/json-gold/ld"
 	"github.com/xeipuuv/gojsonschema"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
+)
+
+var logger = log.New("aries-framework/doc/verifiable")
+
+const jsonSchema2018Type = "JsonSchemaValidator2018"
+
+const (
+	baseContext = "https://www.w3.org/2018/credentials/v1"
+
+	vcType = "VerifiableCredential"
+
+	vpType = "VerifiablePresentation"
 )
 
 type vcModelValidationMode int
@@ -147,6 +162,148 @@ func (vc *Credential) raw() (*rawCredential, error) {
 	}
 
 	return r, nil
+}
+
+func (vc *Credential) validateJSONLD(vcBytes []byte, vcOpts *credentialOpts) error {
+	return ldvalidator.ValidateJSONLD(string(vcBytes),
+		ldvalidator.WithDocumentLoader(vcOpts.jsonldCredentialOpts.jsonldDocumentLoader),
+		ldvalidator.WithExternalContext(vcOpts.jsonldCredentialOpts.externalContext),
+		ldvalidator.WithStrictValidation(vcOpts.strictValidation),
+		ldvalidator.WithStrictContextURIPosition(baseContext))
+}
+
+func (vc *Credential) validateBaseContext(vcBytes []byte, vcOpts *credentialOpts) error {
+	if len(vc.Types) > 1 || vc.Types[0] != vcType {
+		return errors.New("violated type constraint: not base only type defined")
+	}
+
+	if len(vc.Context) > 1 || vc.Context[0] != baseContext {
+		return errors.New("violated @context constraint: not base only @context defined")
+	}
+
+	return vc.validateJSONSchema(vcBytes, vcOpts)
+}
+
+func (vc *Credential) validateBaseContextWithExtendedValidation(vcOpts *credentialOpts, vcBytes []byte) error {
+	for _, vcContext := range vc.Context {
+		if _, ok := vcOpts.allowedCustomContexts[vcContext]; !ok {
+			return fmt.Errorf("not allowed @context: %s", vcContext)
+		}
+	}
+
+	for _, vcType := range vc.Types {
+		if _, ok := vcOpts.allowedCustomTypes[vcType]; !ok {
+			return fmt.Errorf("not allowed @type: %s", vcType)
+		}
+	}
+
+	return vc.validateJSONSchema(vcBytes, vcOpts)
+}
+
+func (vc *Credential) validateJSONSchema(data []byte, opts *credentialOpts) error {
+	return validateCredentialUsingJSONSchema(data, vc.Schemas, opts)
+}
+
+func validateCredentialUsingJSONSchema(data []byte, schemas []TypedID, opts *credentialOpts) error {
+	schemaLoader, err := getSchemaLoader(schemas, opts)
+	if err != nil {
+		return err
+	}
+
+	loader := gojsonschema.NewStringLoader(string(data))
+
+	result, err := gojsonschema.Validate(schemaLoader, loader)
+	if err != nil {
+		return fmt.Errorf("validation of verifiable credential: %w", err)
+	}
+
+	if !result.Valid() {
+		errMsg := describeSchemaValidationError(result, "verifiable credential")
+		return errors.New(errMsg)
+	}
+
+	return nil
+}
+
+func getSchemaLoader(schemas []TypedID, opts *credentialOpts) (gojsonschema.JSONLoader, error) {
+	if opts.disabledCustomSchema {
+		return defaultSchemaLoaderWithOpts(opts), nil
+	}
+
+	for _, schema := range schemas {
+		switch schema.Type {
+		case jsonSchema2018Type:
+			customSchemaData, err := getJSONSchema(schema.ID, opts)
+			if err != nil {
+				return nil, fmt.Errorf("load of custom credential schema from %s: %w", schema.ID, err)
+			}
+
+			return gojsonschema.NewBytesLoader(customSchemaData), nil
+		default:
+			logger.Warnf("unsupported credential schema: %s. Using default schema for validation", schema.Type)
+		}
+	}
+
+	return defaultSchemaLoaderWithOpts(opts), nil
+}
+
+func getJSONSchema(url string, opts *credentialOpts) ([]byte, error) {
+	loader := opts.schemaLoader
+	cache := loader.cache
+
+	//  不开启 cache 的场景
+	if cache == nil {
+		return loadJSONSchema(url, loader.schemaDownloadClient)
+	}
+
+	// cache 中查到数据的场景
+	if cacheBytes, ok := cache.Get(url); ok {
+		return cacheBytes, nil
+	}
+
+	// cache 中没有查到数据的场景
+	schemaBytes, err := loadJSONSchema(url, loader.schemaDownloadClient)
+	if err != nil {
+		return nil, err
+	}
+
+	cache.Put(url, schemaBytes)
+
+	return schemaBytes, nil
+}
+
+func loadJSONSchema(url string, client *http.Client) ([]byte, error) {
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("load credential schema: %w", err)
+	}
+
+	defer func() {
+		e := resp.Body.Close()
+		if e != nil {
+			logger.Errorf("closing response body failed [%v]", e)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("credential schema endpoint HTTP failure [%v]", resp.StatusCode)
+	}
+
+	var gotBody []byte
+	gotBody, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("credential schema: read response body: [%w]", err)
+	}
+
+	return gotBody, nil
+}
+
+func defaultSchemaLoaderWithOpts(opts *credentialOpts) gojsonschema.JSONLoader {
+	if opts.defaultSchema != "" {
+		return gojsonschema.NewStringLoader(opts.defaultSchema)
+	}
+
+	return defaultSchemaLoader()
 }
 
 func contextToRaw(context []string, customContext []interface{}) interface{} {
@@ -530,7 +687,7 @@ func parseSubject(subjectBytes json.RawMessage) (interface{}, error) {
 	var subject Subject
 	err = json.Unmarshal(subjectBytes, &subject)
 	if err == nil {
-		return subject, nil
+		return []Subject{subject}, nil
 	}
 
 	var subjects []Subject
@@ -880,6 +1037,12 @@ func WithPublicKeyFetcher(publicKeyFetcher didsignjwt.PublicKeyFetcher) Credenti
 	}
 }
 
+func WithDisabledProofCheck() CredentialOpt {
+	return func(opts *credentialOpts) {
+		opts.disabledProofCheck = true
+	}
+}
+
 type CredentialSchemaLoader struct {
 	schemaDownloadClient *http.Client
 	cache                SchemaCache
@@ -960,5 +1123,25 @@ func validateDisclosures(vcBytes []byte, disclosures []string) error {
 }
 
 func validateCredential(vc *Credential, vcBytes []byte, vcOpts *credentialOpts) error {
-	return fmt.Errorf("not implemented")
+	switch vcOpts.modelValidationMode {
+	case combinedValidation:
+		err := vc.validateJSONSchema(vcBytes, vcOpts)
+		if err != nil {
+			return err
+		}
+
+		return vc.validateJSONLD(vcBytes, vcOpts)
+
+	case jsonldValidation:
+		return vc.validateJSONLD(vcBytes, vcOpts)
+
+	case baseContextValidation:
+		return vc.validateBaseContext(vcBytes, vcOpts)
+
+	case baseContextExtendedValidation:
+		return vc.validateBaseContextWithExtendedValidation(vcOpts, vcBytes)
+
+	default:
+		return fmt.Errorf("unsupported vcModelValidationMode: %v", vcOpts.modelValidationMode)
+	}
 }

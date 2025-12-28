@@ -20,6 +20,7 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/mux v1.8.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/piprate/json-gold v0.5.0
 	github.com/rs/cors v1.11.1

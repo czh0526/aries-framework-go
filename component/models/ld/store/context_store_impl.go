@@ -16,13 +16,30 @@ type ContextStoreImpl struct {
 }
 
 func (c *ContextStoreImpl) Get(u string) (*jsonld.RemoteDocument, error) {
-	//TODO implement me
-	panic("implement me")
+	b, err := c.store.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("get context from store: %w", err)
+	}
+
+	var rd jsonld.RemoteDocument
+	if err := json.Unmarshal(b, &rd); err != nil {
+		return nil, fmt.Errorf("unmarshal context document: %w", err)
+	}
+
+	return &rd, nil
 }
 
 func (c *ContextStoreImpl) Put(u string, rd *jsonld.RemoteDocument) error {
-	//TODO implement me
-	panic("implement me")
+	b, err := json.Marshal(rd)
+	if err != nil {
+		return fmt.Errorf("marshal remote document: %w", err)
+	}
+
+	if err := c.store.Put(u, b); err != nil {
+		return fmt.Errorf("put remote document: %w", err)
+	}
+
+	return nil
 }
 
 func (c *ContextStoreImpl) Import(documents []ldcontext.Document) error {

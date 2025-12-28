@@ -1,21 +1,50 @@
 package documentloader
 
 import (
+	"errors"
 	"fmt"
 	ldcontext "github.com/czh0526/aries-framework-go/component/models/ld/context"
 	"github.com/czh0526/aries-framework-go/component/models/ld/context/embed"
 	ldstore "github.com/czh0526/aries-framework-go/component/models/ld/store"
+	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 	jsonld "github.com/piprate/json-gold/ld"
 )
+
+var ErrContextNotFound = errors.New("context not found")
 
 type DocumentLoader struct {
 	store                ldstore.ContextStore
 	remoteDocumentLoader jsonld.DocumentLoader
 }
 
-func (d DocumentLoader) LoadDocument(u string) (*jsonld.RemoteDocument, error) {
-	//TODO implement me
-	panic("implement me")
+func (d *DocumentLoader) LoadDocument(u string) (*jsonld.RemoteDocument, error) {
+	rd, err := d.store.Get(u)
+	if err != nil {
+		if !errors.Is(err, spistorage.ErrDataNotFound) {
+			return nil, fmt.Errorf("load document: %w", err)
+		}
+
+		if d.remoteDocumentLoader == nil {
+			return nil, ErrContextNotFound
+		}
+
+		return d.loadDocumentFromURL(u)
+	}
+
+	return rd, nil
+}
+
+func (d *DocumentLoader) loadDocumentFromURL(u string) (*jsonld.RemoteDocument, error) {
+	rd, err := d.remoteDocumentLoader.LoadDocument(u)
+	if err != nil {
+		return nil, fmt.Errorf("load remote context document: %w", err)
+	}
+
+	if err = d.store.Put(u, rd); err != nil {
+		return nil, fmt.Errorf("save loaded document: %w", err)
+	}
+
+	return rd, nil
 }
 
 type documentLoaderOpts struct {

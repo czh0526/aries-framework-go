@@ -26,7 +26,7 @@ func (s *Subject) MarshalJSON() ([]byte, error) {
 func (s *Subject) UnmarshalJSON(data []byte) error {
 	var subjectID string
 
-	if err := json.Unmarshal(data, &subjectID); err != nil {
+	if err := json.Unmarshal(data, &subjectID); err == nil {
 		s.ID = subjectID
 		return nil
 	}

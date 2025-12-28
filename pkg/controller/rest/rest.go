@@ -43,7 +43,7 @@ type genericErrorBody struct {
 	Message string       `json:"message"`
 }
 
-func SendHTTPStatusError(rw http.ResponseWriter, httpStatus int, code command.Code, err command.Error) {
+func SendHTTPStatusError(rw http.ResponseWriter, httpStatus int, code command.Code, err error) {
 	rw.WriteHeader(httpStatus)
 
 	e := json.NewEncoder(rw).Encode(&genericErrorBody{
