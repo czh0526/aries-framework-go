@@ -2,8 +2,11 @@ package verifiable
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
 	"github.com/czh0526/aries-framework-go/component/log"
+	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
 	verifiablemodel "github.com/czh0526/aries-framework-go/component/models/verifiable"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command"
@@ -12,8 +15,10 @@ import (
 	didstore "github.com/czh0526/aries-framework-go/pkg/store/did"
 	verifiablestore "github.com/czh0526/aries-framework-go/pkg/store/verifiable"
 	pverifiable "github.com/czh0526/aries-framework-go/provider/verifiable"
+	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/piprate/json-gold/ld"
 	"io"
+	"strings"
 )
 
 var logger = log.New("aries-framework/command/verifiable")
@@ -83,6 +88,27 @@ const (
 	vpID   = "vpID"
 )
 
+const (
+	Ed25519VerificationKey = "Ed25519VerificationKey"
+	JSONWebKey2020         = "JSONWebKey2020"
+
+	// Ed25519Curve ed25519 curve.
+	Ed25519Curve = "Ed25519"
+
+	// P256KeyCurve EC P-256 curve.
+	P256KeyCurve = "P-256"
+
+	// P384KeyCurve EC P-384 curve.
+	P384KeyCurve = "P-384"
+
+	// P521KeyCurve EC P-521 curve.
+	P521KeyCurve = "P-521"
+)
+
+type provable interface {
+	AddLinkedDataProof(context *verifiablemodel.LinkedDataProofContext, jsonldOpts ...jsonld.ProviderOption) error
+}
+
 type keyResolver interface {
 	PublicKeyFetcher() didsignjwt.PublicKeyFetcher
 }
@@ -105,7 +131,7 @@ func New(p pverifiable.Provider) (*Command, error) {
 
 	didStore, err := didstore.New(p)
 	if err != nil {
-		return nil, fmt.Errorf("new did store: %w", err)
+		return nil, fmt.Errorf("new didmodel store: %w", err)
 	}
 
 	return &Command{
@@ -283,9 +309,9 @@ func (o *Command) SignCredential(rw io.Writer, req io.Reader) command.Error {
 		doc, resolveErr := o.ctx.VDRegistry().Resolve(request.DID)
 		if resolveErr != nil {
 			logutil.LogError(logger, CommandName, SignCredentialCommandMethod,
-				fmt.Sprintf("failed to get did doc from store or vdr: %s", err))
+				fmt.Sprintf("failed to get didmodel doc from store or vdr: %s", err))
 			return command.NewValidationError(SignCredentialErrorCode,
-				fmt.Errorf("failed to get did doc from store or vdr: %w", err))
+				fmt.Errorf("failed to get didmodel doc from store or vdr: %w", err))
 		}
 		didDoc = doc.DIDDocument
 	}
@@ -323,4 +349,178 @@ func (o *Command) SignCredential(rw io.Writer, req io.Reader) command.Error {
 	logutil.LogDebug(logger, CommandName, SignCredentialCommandMethod, "get vc success")
 
 	return nil
+}
+
+func (o *Command) addCredentialProof(vc *verifiablemodel.Credential, didDoc *didmodel.Doc, opts *ProofOptions) error {
+	var err error
+
+	opts, err = prepareOpts(opts, didDoc, didmodel.AssertionMethod)
+	if err != nil {
+		return err
+	}
+
+	return o.addLinkedDataProof(vc, opts)
+}
+
+func (o *Command) addLinkedDataProof(p provable, opts *ProofOptions) error {
+
+}
+
+func prepareOpts(opts *ProofOptions, didDoc *didmodel.Doc,
+	method didmodel.VerificationRelationship) (*ProofOptions, error) {
+
+	if opts == nil {
+		opts = &ProofOptions{}
+	}
+
+	var err error
+
+	opts.proofPurpose, err = getProofPurpose(method)
+	if err != nil {
+		return nil, err
+	}
+
+	vmType := ""
+	switch opts.SignatureType {
+	case "Ed25519Signature2018":
+		vmType = "Ed25519Signature2018"
+	case "BbsBlsSignature2020":
+		vmType = "Bls12381G2Key12020"
+	}
+
+	vMs := didDoc.VerificationMethods(method)[method]
+	vmMatched := opts.VerificationMethod == ""
+
+	for _, vm := range vMs {
+		if opts.VerificationMethod != "" {
+			// 如果指定了 verificationMethod, 匹配指定的 verificationMethod
+			if opts.VerificationMethod == vm.VerificationMethod.ID {
+				vmMatched = true
+				break
+			}
+
+			continue
+
+		} else {
+			// 如果没有指定 verificationMethod, 取第一个 Authentication 公钥
+			if vmType != "" && vm.VerificationMethod.Type != vmType {
+				continue
+			}
+
+			opts.VerificationMethod = vm.VerificationMethod.ID
+			break
+		}
+	}
+
+	if !vmMatched {
+		return nil, fmt.Errorf("unable to find matching `%s` key IDs for given verification method",
+			opts.VerificationMethod)
+	}
+
+	if opts.VerificationMethod == "" {
+		logger.Warnf("Could not find matching verification method for `%s` proof purpose", opts.proofPurpose)
+
+		var defaultVM string
+		defaultVM, err = getDefaultVerificationMethod(didDoc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default verification method: %w", err)
+		}
+
+		opts.VerificationMethod = defaultVM
+	}
+
+	if strings.Index(opts.VerificationMethod, "#key-") > 0 {
+		err = buildKIDOption(opts, didDoc.VerificationMethod)
+		if err != nil {
+			return nil, fmt.Errorf("build KMS KID error: %w", err)
+		}
+	}
+
+	return opts, nil
+}
+
+func buildKIDOption(opts *ProofOptions, vms []didmodel.VerificationMethod) error {
+	for _, vm := range vms {
+		if opts.VerificationMethod == vm.ID {
+			if len(vm.Value) > 0 {
+				kt := spikms.ED25519Type
+
+				switch vm.Type {
+				case Ed25519VerificationKey:
+				case JSONWebKey2020:
+					kt = kmsKeyTypeByJWKCurve(vm.JSONWebKey().Crv)
+				}
+
+				kid, err := jwkkid.CreateKID(vm.Value, kt)
+				if err != nil {
+					return fmt.Errorf("failed to get default verification method: %w", err)
+				}
+
+				opts.KID = kid
+			}
+		}
+	}
+
+	return nil
+}
+
+func kmsKeyTypeByJWKCurve(crv string) spikms.KeyType {
+	kt := spikms.ED25519Type
+
+	switch crv {
+	case Ed25519Curve:
+	case P256KeyCurve:
+		kt = spikms.ECDSAP256TypeIEEEP1363
+	case P384KeyCurve:
+		kt = spikms.ECDSAP384TypeIEEEP1363
+	case P521KeyCurve:
+		kt = spikms.ECDSAP521IEEEP1363
+	}
+
+	return kt
+}
+
+func getDefaultVerificationMethod(didDoc *didmodel.Doc) (string, error) {
+	switch {
+	case len(didDoc.VerificationMethod) > 0:
+		var publicKeyID string
+
+		for _, k := range didDoc.VerificationMethod {
+			if strings.HasSuffix(k.ID, Ed25519VerificationKey) {
+				publicKeyID = k.ID
+				break
+			}
+		}
+
+		if publicKeyID == "" {
+			publicKeyID = didDoc.VerificationMethod[0].ID
+		}
+
+		if !isDID(publicKeyID) {
+			return didDoc.ID + publicKeyID, nil
+		}
+
+		return publicKeyID, nil
+
+	case len(didDoc.Authentication) > 0:
+		return didDoc.Authentication[0].VerificationMethod.ID, nil
+	default:
+		return "", errors.New("public key not found in DID Document")
+	}
+}
+
+func isDID(str string) bool {
+	return strings.HasPrefix(str, "did:")
+}
+
+func getProofPurpose(method didmodel.VerificationRelationship) (string, error) {
+	if method != didmodel.Authentication && method != didmodel.AssertionMethod {
+		return "", fmt.Errorf("unsupported proof purpose, only authentication or assertionMethod are supported")
+	}
+
+	if method == didmodel.Authentication {
+		return "authentication", nil
+	}
+
+	return "assertionMethod", nil
 }
