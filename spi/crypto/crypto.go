@@ -7,6 +7,9 @@ type Crypto interface {
 	Sign(msg []byte, kh interface{}) ([]byte, error)
 	Verify(signature, msg []byte, kh interface{}) error
 
+	SignMulti(messages [][]byte, kh interface{}) ([]byte, error)
+	VerifyMulti(messages [][]byte, signature []byte, kh interface{}) error
+
 	ComputeMAC(data []byte, kh interface{}) ([]byte, error)
 	VerifyMAC(mac, data []byte, kh interface{}) error
 

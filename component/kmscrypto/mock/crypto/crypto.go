@@ -43,6 +43,14 @@ func (c *Crypto) Verify(signature, msg []byte, kh interface{}) error {
 	return c.VerifyErr
 }
 
+func (c *Crypto) SignMulti(messages [][]byte, kh interface{}) ([]byte, error) {
+	return c.SignValue, c.SignErr
+}
+
+func (c *Crypto) VerifyMulti(messages [][]byte, signature []byte, kh interface{}) error {
+	return c.VerifyErr
+}
+
 func (c *Crypto) ComputeMAC(data []byte, kh interface{}) ([]byte, error) {
 	//TODO implement me
 	panic("implement me")

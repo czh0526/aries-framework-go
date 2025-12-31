@@ -5,9 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/jwkkid"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/util/kmssigner"
 	"github.com/czh0526/aries-framework-go/component/log"
 	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
 	"github.com/czh0526/aries-framework-go/component/models/jwt/didsignjwt"
+	ldprocessormodel "github.com/czh0526/aries-framework-go/component/models/ld/processor"
+	signermodel "github.com/czh0526/aries-framework-go/component/models/signature/signer"
+	sigsuite "github.com/czh0526/aries-framework-go/component/models/signature/suite"
 	verifiablemodel "github.com/czh0526/aries-framework-go/component/models/verifiable"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command/vdr"
@@ -15,6 +19,7 @@ import (
 	didstore "github.com/czh0526/aries-framework-go/pkg/store/did"
 	verifiablestore "github.com/czh0526/aries-framework-go/pkg/store/verifiable"
 	pverifiable "github.com/czh0526/aries-framework-go/provider/verifiable"
+	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	"github.com/piprate/json-gold/ld"
 	"io"
@@ -92,6 +97,14 @@ const (
 	Ed25519VerificationKey = "Ed25519VerificationKey"
 	JSONWebKey2020         = "JSONWebKey2020"
 
+	// Ed25519Signature2018 ed25519 signature suite.
+	Ed25519Signature2018 = "Ed25519Signature2018"
+	// JSONWebSignature2020 json web signature suite.
+	JSONWebSignature2020 = "JsonWebSignature2020"
+
+	// BbsBlsSignature2020 BBS signature suite.
+	BbsBlsSignature2020 = "BbsBlsSignature2020"
+
 	// Ed25519Curve ed25519 curve.
 	Ed25519Curve = "Ed25519"
 
@@ -103,11 +116,18 @@ const (
 
 	// P521KeyCurve EC P-521 curve.
 	P521KeyCurve = "P-521"
+
+	p256Alg = "ES256"
+	p384Alg = "ES384"
+	p521Alg = "ES521"
+	edAlg   = "EdDSA"
 )
 
 type provable interface {
-	AddLinkedDataProof(context *verifiablemodel.LinkedDataProofContext, jsonldOpts ...jsonld.ProviderOption) error
+	AddLinkedDataProof(context *verifiablemodel.LinkedDataProofContext, jsonldOpts ...ldprocessormodel.Opts) error
 }
+
+var _ provable = (*verifiablemodel.Credential)(nil)
 
 type keyResolver interface {
 	PublicKeyFetcher() didsignjwt.PublicKeyFetcher
@@ -363,7 +383,43 @@ func (o *Command) addCredentialProof(vc *verifiablemodel.Credential, didDoc *did
 }
 
 func (o *Command) addLinkedDataProof(p provable, opts *ProofOptions) error {
+	s, err := newKMSSigner(o.ctx.KMS(), o.ctx.Crypto(), getKID(opts))
+	if err != nil {
+		return err
+	}
 
+	var signatureSuite signermodel.SignatureSuite
+
+	switch opts.SignatureType {
+	case Ed25519Signature2018:
+		signatureSuite = ed25519signature2018.New(sigsuite.WithSigner(s))
+	case JSONWebSignature2020:
+		signatureSuite = jsonwebsignature2020.New(sigsuite.WithSigner(s))
+	case BbsBlsSignature2020:
+		signatureSuite = bbsblssignature2020.New(sigsuite.WithSigner(s))
+	default:
+		return fmt.Errorf("signature type unsupported %s", opts.SignatureType)
+	}
+
+	return p.AddLinkedDataProof(opts, signatureSuite)
+}
+
+func newKMSSigner(keyManager spikms.KeyManager, c spicrypto.Crypto, kid string) (
+	*kmssigner.KMSSigner, error) {
+	keyHandler, err := keyManager.Get(kid)
+	if err != nil {
+		return nil, err
+	}
+
+	_, kt, err := keyManager.ExportPubKeyBytes(kid)
+	if err != nil {
+		return nil, err
+	}
+	return &kmssigner.KMSSigner{
+		KeyHandle: keyHandler,
+		Crypto:    c,
+		KeyType:   kt,
+	}, nil
 }
 
 func prepareOpts(opts *ProofOptions, didDoc *didmodel.Doc,

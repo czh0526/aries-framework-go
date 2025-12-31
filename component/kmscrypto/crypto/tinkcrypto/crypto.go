@@ -105,6 +105,14 @@ func (c *Crypto) Verify(sig, msg []byte, kh interface{}) error {
 	return err
 }
 
+func (c *Crypto) SignMulti(messages [][]byte, kh interface{}) ([]byte, error) {
+	return nil, fmt.Errorf("SignMulti: not implemented")
+}
+
+func (c *Crypto) VerifyMulti(messages [][]byte, signature []byte, kh interface{}) error {
+	return fmt.Errorf("VerifyMulti: not implemented")
+}
+
 func (c *Crypto) ComputeMAC(data []byte, kh interface{}) ([]byte, error) {
 	keyHandle, ok := kh.(*keyset.Handle)
 	if !ok {
