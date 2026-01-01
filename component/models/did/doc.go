@@ -209,6 +209,17 @@ func ParseDocumentResolution(data []byte) (*DocResolution, error) {
 	}, nil
 }
 
+func BuildDoc(opts ...DocOption) *Doc {
+	doc := &Doc{}
+	doc.Context = []string{ContextV1}
+	
+	for _, opt := range opts {
+		opt(doc)
+	}
+
+	return doc
+}
+
 func (doc *Doc) JSONBytes() ([]byte, error) {
 	context, ok := ContextPeekString(doc.Context)
 	if !ok {
@@ -367,6 +378,50 @@ func (r *rawDoc) schemaLoader() gojsonschema.JSONLoader {
 		return schemaLoaderV12019
 	default:
 		return schemaLoaderV1
+	}
+}
+
+type DocOption func(opts *Doc)
+
+func WithService(svc []Service) DocOption {
+	return func(opts *Doc) {
+		opts.Service = svc
+	}
+}
+
+func WithAuthentication(auth []Verification) DocOption {
+	return func(opts *Doc) {
+		opts.Authentication = auth
+	}
+}
+
+func WithAssertion(assertion []Verification) DocOption {
+	return func(opts *Doc) {
+		opts.AssertionMethod = assertion
+	}
+}
+
+func WithKeyAgreement(keyAgreement []Verification) DocOption {
+	return func(opts *Doc) {
+		opts.KeyAgreement = keyAgreement
+	}
+}
+
+func WithCreatedTime(createdTime time.Time) DocOption {
+	return func(opts *Doc) {
+		opts.Created = &createdTime
+	}
+}
+
+func WithUpdatedTime(updatedTime time.Time) DocOption {
+	return func(opts *Doc) {
+		opts.Updated = &updatedTime
+	}
+}
+
+func WithVerificationMethod(pubKey []VerificationMethod) DocOption {
+	return func(opts *Doc) {
+		opts.VerificationMethod = pubKey
 	}
 }
 

@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/multiformats/go-multibase v0.2.0
-	github.com/piprate/json-gold v0.5.0
+	github.com/piprate/json-gold v0.7.0
 	github.com/stretchr/testify v1.10.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 )

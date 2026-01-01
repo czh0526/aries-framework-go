@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	SignatureProofValue SignatureRepresentation = iota
+	SignatureJWS
+)
+
 type SignatureRepresentation int
 
 type LinkedDataProofContext struct {

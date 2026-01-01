@@ -19,30 +19,6 @@ type VDR struct {
 	store spistorage.Store
 }
 
-func (V VDR) Read(did string, opts ...vdr.DIDMethodOption) (*did.DocResolution, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (V VDR) Create(did *did.Doc, opts ...vdr.DIDMethodOption) (*did.DocResolution, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (V VDR) Accept(method string, opts ...vdr.DIDMethodOption) bool {
-	return method == DIDMethod
-}
-
-func (V VDR) Update(did *did.Doc, opts ...vdr.DIDMethodOption) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (V VDR) Deactivate(did string, opts ...vdr.DIDMethodOption) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 func New(p spistorage.Provider) (*VDR, error) {
 	didDBStore, err := p.OpenStore(StoreNamespace)
 	if err != nil {
@@ -52,4 +28,18 @@ func New(p spistorage.Provider) (*VDR, error) {
 	return &VDR{
 		store: didDBStore,
 	}, nil
+}
+
+func (v *VDR) Accept(method string, opts ...vdr.DIDMethodOption) bool {
+	return method == DIDMethod
+}
+
+func (v *VDR) Update(did *did.Doc, opts ...vdr.DIDMethodOption) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v *VDR) Deactivate(did string, opts ...vdr.DIDMethodOption) error {
+	//TODO implement me
+	panic("implement me")
 }

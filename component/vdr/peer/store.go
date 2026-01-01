@@ -3,14 +3,13 @@ package peer
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	didmodel "github.com/czh0526/aries-framework-go/component/models/did"
+	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
+	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 	"time"
 )
-
-func (V VDR) Close() error {
-	return nil
-}
 
 type modifiedBy struct {
 	Key string `json:"key,omitempty"`
@@ -21,6 +20,55 @@ type docDelta struct {
 	Change     string        `json:"change,omitempty"`
 	ModifiedBy *[]modifiedBy `json:"by,omitempty"`
 	ModifiedAt time.Time     `json:"when,omitempty"`
+}
+
+func (v *VDR) Get(id string) (*didmodel.Doc, error) {
+	if id == "" {
+		return nil, errors.New("ID is mandatory")
+	}
+
+	deltas, err := v.getDeltas(id)
+	if err != nil {
+		return nil, fmt.Errorf("delta data fetch from store for did[%s] failed: %w", id, err)
+	}
+
+	return assembleDocFromDeltas(deltas)
+}
+
+func (v *VDR) getDeltas(id string) ([]docDelta, error) {
+	val, err := v.store.Get(id)
+	if errors.Is(err, spistorage.ErrDataNotFound) {
+		return nil, vdrapi.ErrNotFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("fetching data from store failed: %w", err)
+	}
+
+	var deltas []docDelta
+	err = json.Unmarshal(val, &deltas)
+	if err != nil {
+		return nil, fmt.Errorf("JSON unmarshalling of document deltas failed: %w", err)
+	}
+
+	return deltas, nil
+}
+
+func (v *VDR) storeDID(doc *didmodel.Doc, by *[]modifiedBy) error {
+	if doc == nil || doc.ID == "" {
+		return errors.New("DID and document are mandatory")
+	}
+
+	val, err := genesisDeltaBytes(doc, by)
+	if err != nil {
+		return err
+	}
+
+	return v.store.Put(doc.ID, val)
+}
+
+func (v *VDR) Close() error {
+	return nil
 }
 
 func genesisDeltaBytes(doc *didmodel.Doc, by *[]modifiedBy) ([]byte, error) {

@@ -12,6 +12,9 @@ import (
 	ldprocessormodel "github.com/czh0526/aries-framework-go/component/models/ld/processor"
 	signermodel "github.com/czh0526/aries-framework-go/component/models/signature/signer"
 	sigsuite "github.com/czh0526/aries-framework-go/component/models/signature/suite"
+	"github.com/czh0526/aries-framework-go/component/models/signature/suite/bbsblssignature2020"
+	"github.com/czh0526/aries-framework-go/component/models/signature/suite/ed25519signature2018"
+	"github.com/czh0526/aries-framework-go/component/models/signature/suite/jsonwebsignature2020"
 	verifiablemodel "github.com/czh0526/aries-framework-go/component/models/verifiable"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command/vdr"
@@ -91,6 +94,8 @@ const (
 	vcID   = "vcID"
 	vcName = "vcName"
 	vpID   = "vpID"
+
+	creatorParts = 2
 )
 
 const (
@@ -401,7 +406,45 @@ func (o *Command) addLinkedDataProof(p provable, opts *ProofOptions) error {
 		return fmt.Errorf("signature type unsupported %s", opts.SignatureType)
 	}
 
-	return p.AddLinkedDataProof(opts, signatureSuite)
+	// 设置 signature representation
+	signatureRepresentation := verifiablemodel.SignatureJWS
+
+	if opts.SignatureRepresentation == nil {
+		opts.SignatureRepresentation = &signatureRepresentation
+	}
+
+	// 构建 Context
+	signingCtx := &verifiablemodel.LinkedDataProofContext{
+		VerificationMethod:      opts.VerificationMethod,
+		SignatureRepresentation: *opts.SignatureRepresentation,
+		SignatureType:           opts.SignatureType,
+		Suite:                   signatureSuite,
+		Created:                 opts.Created,
+		Domain:                  opts.Domain,
+		Challenge:               opts.Challenge,
+		Purpose:                 opts.proofPurpose,
+	}
+
+	// Add Linked Data Proof
+	err = p.AddLinkedDataProof(signingCtx, ldprocessormodel.WithDocumentLoader(o.documentLoader))
+	if err != nil {
+		return fmt.Errorf("failed to add linkd data proof: %w", err)
+	}
+
+	return nil
+}
+
+func getKID(opts *ProofOptions) string {
+	if opts.KID != "" {
+		return opts.KID
+	}
+
+	idSplit := strings.Split(opts.VerificationMethod, "#")
+	if len(idSplit) == creatorParts {
+		return idSplit[1]
+	}
+
+	return ""
 }
 
 func newKMSSigner(keyManager spikms.KeyManager, c spicrypto.Crypto, kid string) (
