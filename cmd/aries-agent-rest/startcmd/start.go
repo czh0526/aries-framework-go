@@ -8,6 +8,7 @@ import (
 	"github.com/czh0526/aries-framework-go/component/storage/mysql"
 	"github.com/czh0526/aries-framework-go/pkg/controller"
 	"github.com/czh0526/aries-framework-go/pkg/framework/aries"
+	"github.com/czh0526/aries-framework-go/pkg/framework/aries/defaults"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,6 +27,18 @@ const (
 	agentHostFlagName      = "api-host"
 	agentHostFlagShorthand = "a"
 	agentHostFlagUsage     = "Host Name:Port. Alternatively, this can be set with the following environment variable: " + agentHostEnvKey
+
+	agentInboundHostEnvKey        = "ARIES_INBOUND_HOST"
+	agentInboundHostFlagName      = "inbound-host"
+	agentInboundHostFlagShorthand = "i"
+	agentInboundHostFlagUsage     = "Inbound Host Name:Port. Alternatively, this can be set with the following environment variable: " +
+		agentInboundHostEnvKey
+
+	agentInboundHostExternalEnvKey        = "ARIES_INBOUND_HOST_EXTERNAL"
+	agentInboundHostExternalFlagName      = "inbound-host-external"
+	agentInboundHostExternalFlagShorthand = "e"
+	agentInboundHostExternalFlagUsage     = "Inbound Host External Name:Port. Alternatively, this can be set with the following environment variable: " +
+		agentInboundHostExternalEnvKey
 
 	databaseTypeEnvKey        = "ARIES_DATABASE_TYPE"
 	databaseTypeFlagName      = "database-type"
@@ -46,6 +60,9 @@ const (
 
 	databaseTypeMemOption   = "mem"
 	databaseTypeMySQLOption = "mysql"
+
+	httpProtocol      = "http"
+	websocketProtocol = "ws"
 )
 
 var (
@@ -114,15 +131,23 @@ func createStartCMD(server server) *cobra.Command {
 }
 
 func createFlags(startCmd *cobra.Command) {
+	// api-host
 	startCmd.Flags().StringP(agentHostFlagName, agentHostFlagShorthand, "", agentHostFlagUsage)
+	// inbound-host
+	startCmd.Flags().StringSliceP(agentInboundHostFlagName, agentInboundHostFlagShorthand, []string{}, agentInboundHostFlagUsage)
+	// inbound-host-external
+	startCmd.Flags().StringSliceP(agentInboundHostExternalFlagName, agentInboundHostExternalFlagShorthand, []string{}, agentInboundHostExternalFlagUsage)
+	// database-type
 	startCmd.Flags().StringP(databaseTypeFlagName, databaseTypeFlagShorthand, "", databaseTypeFlagUsage)
+	// database-prefix
 	startCmd.Flags().StringP(databasePrefixFlagName, databasePrefixFlagShorthand, "", databasePrefixFlagUsage)
 }
 
 type AgentParameters struct {
-	server  server
-	host    string
-	dbParam *dbParam
+	server                                     server
+	host                                       string
+	inboundHostInternals, inboundHostExternals []string
+	dbParam                                    *dbParam
 }
 
 type dbParam struct {
@@ -185,6 +210,7 @@ func createStoreProviders(params *AgentParameters) (spistorage.Provider, error) 
 
 func createAriesAgent(params *AgentParameters) (*context.Context, error) {
 	var opts []aries.Option
+
 	// 构建 Store Provider
 	storePro, err := createStoreProviders(params)
 	if err != nil {
@@ -193,6 +219,14 @@ func createAriesAgent(params *AgentParameters) (*context.Context, error) {
 
 	// 构建 Aries 参数
 	opts = append(opts, aries.WithStoreProvider(storePro))
+
+	inboundTransportOpt, err := getInboundTransportOpts(params.inboundHostInternals,
+		params.inboundHostExternals, "", "", 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start aries agent rest on port `%s`, failed to inbound transport opt: %w", err)
+	}
+
+	opts = append(opts, inboundTransportOpt...)
 
 	// 构建 Aries
 	framework, err := aries.New(opts...)
@@ -208,8 +242,62 @@ func createAriesAgent(params *AgentParameters) (*context.Context, error) {
 	return ctx, nil
 }
 
+func getInboundTransportOpts(inboundHostInternals, inboundHostExternals []string,
+	certFile, keyFile string, readLimit int64) ([]aries.Option, error) {
+	internalHost, err := getInboundSchemeToURLMap(inboundHostInternals)
+	if err != nil {
+		return nil, fmt.Errorf("inbound internal host: %w", err)
+	}
+
+	externalHost, err := getInboundSchemeToURLMap(inboundHostExternals)
+	if err != nil {
+		return nil, fmt.Errorf("inbound external host: %w", err)
+	}
+
+	var opts []aries.Option
+
+	for scheme, host := range internalHost {
+		switch scheme {
+		case httpProtocol:
+			opts = append(opts, defaults.WithInboundHTTPAddr(host, externalHost[scheme], certFile, keyFile))
+		default:
+			return nil, fmt.Errorf("inbound transport `%s` not supported", scheme)
+		}
+	}
+
+	return opts, nil
+}
+
+func getInboundSchemeToURLMap(schemeHostStr []string) (map[string]string, error) {
+	const validSliceLen = 2
+
+	schemeHostMap := make(map[string]string)
+
+	for _, schemeHost := range schemeHostStr {
+		schemeHostSlice := strings.Split(schemeHost, "@")
+		if len(schemeHostSlice) != validSliceLen {
+			return nil, fmt.Errorf("invalid inbound host option: Use scheme@url to pass the option")
+		}
+
+		schemeHostMap[schemeHostSlice[0]] = schemeHostSlice[1]
+	}
+
+	return schemeHostMap, nil
+}
+
 func NewAgentParameters(server server, cmd *cobra.Command) (*AgentParameters, error) {
 	host, err := getUserSetVar(cmd, agentHostFlagName, agentHostEnvKey, false)
+	if err != nil {
+		return nil, err
+	}
+
+	inboundHosts, err := getUserSetVars(cmd, agentInboundHostFlagName, agentInboundHostEnvKey, true)
+	if err != nil {
+		return nil, err
+	}
+
+	inboundHostExternals, err := getUserSetVars(cmd, agentInboundHostExternalFlagName,
+		agentInboundHostExternalEnvKey, true)
 	if err != nil {
 		return nil, err
 	}
@@ -220,9 +308,11 @@ func NewAgentParameters(server server, cmd *cobra.Command) (*AgentParameters, er
 	}
 
 	parameters := &AgentParameters{
-		server:  server,
-		host:    host,
-		dbParam: dbParam,
+		server:               server,
+		host:                 host,
+		inboundHostInternals: inboundHosts,
+		inboundHostExternals: inboundHostExternals,
+		dbParam:              dbParam,
 	}
 
 	return parameters, nil
@@ -244,6 +334,30 @@ func getUserSetVar(cmd *cobra.Command, flagName, envKey string, isOptional bool)
 	}
 
 	return "", fmt.Errorf(" Neither %s(command lint flag) nor %s(environment variable) have been set.", flagName, envKey)
+}
+
+func getUserSetVars(cmd *cobra.Command, flagName, envKey string, isOptional bool) ([]string, error) {
+	if cmd != nil && cmd.Flags().Changed(flagName) {
+		value, err := cmd.Flags().GetStringSlice(flagName)
+		if err != nil {
+			return nil, fmt.Errorf("`%s` flag not found: %s", flagName, err)
+		}
+
+		return value, nil
+	}
+
+	var values []string
+
+	value, isSet := os.LookupEnv(envKey)
+	if isSet {
+		values = strings.Split(value, ",")
+	}
+
+	if isOptional || isSet {
+		return values, nil
+	}
+
+	return nil, fmt.Errorf("`%s` not set. It must be set via either command line or environment variable", flagName)
 }
 
 func getDBParam(cmd *cobra.Command) (*dbParam, error) {

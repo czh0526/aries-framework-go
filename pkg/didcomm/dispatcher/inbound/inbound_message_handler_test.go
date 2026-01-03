@@ -25,9 +25,9 @@ func TestMessageHandler_HandlerFunc(t *testing.T) {
 
 	err := handleFunc(&transport.Envelope{
 		Message: []byte(`{
-	"@id": "12345",
-	"@type": "message-type",
-}`),
+			"@id": "12345",
+			"@type": "message-type",
+		}`),
 	})
 	require.NoError(t, err)
 }

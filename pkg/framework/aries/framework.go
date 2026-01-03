@@ -17,6 +17,7 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	"github.com/czh0526/aries-framework-go/pkg/framework/aries/api"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
+	verifiablestore "github.com/czh0526/aries-framework-go/pkg/store/verifiable"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
 	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
@@ -47,6 +48,7 @@ type Aries struct {
 	// vdr
 	vdr               []vdrapi.VDR
 	vdrRegistry       vdrapi.Registry
+	verifiableStore   verifiablestore.Store
 	documentLoader    jsonld.DocumentLoader
 	packerCreator     packer.Creator
 	packerCreators    []packer.Creator
@@ -160,7 +162,10 @@ func initializeServices(aries *Aries) (*Aries, error) {
 }
 
 func startTransports(aries *Aries) error {
-	ctx, err := context.New()
+	ctx, err := context.New(
+		context.WithCrypto(aries.crypto),
+		context.WithPackager(aries.packager),
+		context.WithInboundEnvelopeHandler(&aries.inboundEnvelopeHandler))
 
 	for _, inbound := range aries.inboundTransports {
 		if err = inbound.Start(ctx); err != nil {
@@ -416,6 +421,9 @@ func loadServices(aries *Aries) error {
 	aries.inboundEnvelopeHandler = inbound.MessageHandler{}
 
 	ctx, err := context.New(
+		context.WithStorageProvider(aries.storeProvider),
+		context.WithProtocolStateStorageProvider(aries.protocolStateStoreProvider),
+		context.WithInboundEnvelopeHandler(&aries.inboundEnvelopeHandler),
 		context.WithOutboundDispatcher(aries.outboundDispatcher),
 	)
 	if err != nil {

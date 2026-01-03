@@ -2,10 +2,14 @@ package aries
 
 import (
 	"fmt"
+	messagepickup "github.com/czh0526/aries-framework-go/pkg/didcomm/protocol/mssagepickup"
+	"net/http"
+
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packager"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer/anoncrypt"
@@ -15,8 +19,11 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	aries_http "github.com/czh0526/aries-framework-go/pkg/didcomm/transport/http"
 	doc_jose "github.com/czh0526/aries-framework-go/pkg/doc/jose"
+	ariesapi "github.com/czh0526/aries-framework-go/pkg/framework/aries/api"
+	"github.com/czh0526/aries-framework-go/pkg/framework/context"
+	"github.com/czh0526/aries-framework-go/pkg/store/verifiable"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	"net/http"
+	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 )
 
 func defFrameworkOpts(aries *Aries) error {
@@ -37,24 +44,33 @@ func defFrameworkOpts(aries *Aries) error {
 		aries.storeProvider = storeProvider()
 	}
 
-	// 在 storage 中创建 `context_store`
+	// 创建 JSON-LD ContextStore
 	err := createJSONLDContextStore(aries)
 	if err != nil {
 		return err
 	}
 
-	// 在 storage 中创建 `remote_provider_store`
+	// 创建 remote JSON-LD provider store
 	err = createJSONLDRemoteProviderStore(aries)
 	if err != nil {
 		return err
 	}
 
-	// 根据 context_store, remote_provider_store,
-	// 创建 `document_loader`
+	// 创建 JSON-LD document loader
 	err = createJSONLDDocumentLoader(aries)
 	if err != nil {
 		return err
 	}
+
+	// 创建 verifiable store
+	err = assignVerifiableStoreIfNeeded(aries, aries.storeProvider)
+	if err != nil {
+		return err
+	}
+
+	//
+	aries.protocolSvcCreators = append(aries.protocolSvcCreators,
+		newMessagePickupSvc())
 
 	if aries.secretLock == nil && aries.kmsCreator == nil {
 		err = createDefSecretLock(aries)
@@ -135,4 +151,33 @@ func setDefaultKMSCryptoOpts(aries *Aries) error {
 	}
 
 	return nil
+}
+
+func assignVerifiableStoreIfNeeded(aries *Aries, storeProvider spistorage.Provider) error {
+	if aries.verifiableStore != nil {
+		return nil
+	}
+
+	provider, err := context.New(
+		context.WithStorageProvider(storeProvider),
+		context.WithJSONLDDocumentLoader(aries.documentLoader))
+	if err != nil {
+		return fmt.Errorf("failed to initialize verifiable store: %w", err)
+	}
+
+	// 构建一个 verifiable store
+	aries.verifiableStore, err = verifiable.New(provider)
+	if err != nil {
+		return fmt.Errorf("can't initialize verifiable store: %w", err)
+	}
+
+	return nil
+}
+
+func newMessagePickupSvc() ariesapi.ProtocolSvcCreator {
+	return ariesapi.ProtocolSvcCreator{
+		Create: func(prv ariesapi.Provider) (dispatcher.ProtocolService, error) {
+			return &messagepickup.Service{}, nil
+		},
+	}
 }

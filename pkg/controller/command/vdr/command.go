@@ -151,12 +151,6 @@ func (o *Command) ResolveDID(rw io.Writer, req io.Reader) command.Error {
 
 	_, err = rw.Write(docBytes)
 	if err != nil {
-		logutil.LogError(logger, CommandName, CreateDIDCommandMethod, err.Error())
-		return command.NewValidationError(InvalidRequestErrorCode, fmt.Errorf("write response: %w", err))
-	}
-
-	_, err = rw.Write(docBytes)
-	if err != nil {
 		logger.Errorf("Unable to send error response: %w", err)
 	}
 

@@ -92,3 +92,18 @@ func (s *Service) Initialize(p interface{}) error {
 func (s *Service) Name() string {
 	return MessagePickup
 }
+
+func (s *Service) HandleInbound(msg service.DIDCommMsg, ctx service.DIDCommContext) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *Service) HandleOutbound(msg service.DIDCommMsg, myDID, theirDID string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *Service) Accept(msgType string) bool {
+	//TODO implement me
+	panic("implement me")
+}

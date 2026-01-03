@@ -1,6 +1,8 @@
 package vdr
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command/vdr"
@@ -8,6 +10,7 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/controller/internal/cmdutil"
 	"github.com/czh0526/aries-framework-go/pkg/controller/rest"
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
+	"github.com/gorilla/mux"
 	"net/http"
 )
 
@@ -16,7 +19,7 @@ const (
 	vdrDIDPath        = VDROperationID + "/did"
 	SaveDIDPath       = vdrDIDPath
 	GetDIDPath        = vdrDIDPath + "/{id}"
-	ResolveDIDPath    = vdrDIDPath + "/resolve"
+	ResolveDIDPath    = vdrDIDPath + "/resolve/{id}"
 	CreateDIDPath     = vdrDIDPath + "/create"
 	GetDIDRecordsPath = vdrDIDPath + "/records"
 )
@@ -76,7 +79,18 @@ func (o *Operation) CreateDID(rw http.ResponseWriter, req *http.Request) {
 //	default: genericError
 //	    200: resolveDIDRes
 func (o *Operation) ResolveDID(rw http.ResponseWriter, req *http.Request) {
-	rest.Execute(o.command.ResolveDID, rw, req.Body)
+	id := mux.Vars(req)["id"]
+
+	decodedID, err := base64.StdEncoding.DecodeString(id)
+	if err != nil {
+		rest.SendHTTPStatusError(rw, http.StatusBadRequest, vdr.InvalidRequestErrorCode,
+			fmt.Errorf("invalid id"))
+		return
+	}
+
+	request := fmt.Sprintf(`{"id": "%s"}`, string(decodedID))
+
+	rest.Execute(o.command.ResolveDID, rw, bytes.NewBufferString(request))
 }
 
 // SaveDID swagger:route POST /vdr/did vdr saveDIDReq
