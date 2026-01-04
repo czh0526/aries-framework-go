@@ -8,7 +8,6 @@ import (
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/crypto/tinkcrypto"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packager"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
@@ -26,6 +25,17 @@ import (
 	spistorage "github.com/czh0526/aries-framework-go/spi/storage"
 )
 
+// defFrameworkOpts 对于外部没有设置的 Aries 属性进行设置
+// 包括：
+//
+//	1）outbound Transports
+//	2）store Provider
+//	3) JSON-LD Context Store         => 数据库名: ldcontext
+//	4) JSON-LD Remote Provider Store => 数据库名: remove_providers
+//	5) verifiable Store 			 => 数据库名: verifiable
+//	6）JSON-LD Document Loader
+//	7) 各种 ServiceCreator 函数集合
+//	8) 其它的属性设置
 func defFrameworkOpts(aries *Aries) error {
 
 	// 设置 Outbound Transport
@@ -68,7 +78,7 @@ func defFrameworkOpts(aries *Aries) error {
 		return err
 	}
 
-	//
+	// 设置各种 Service Creator 函数集合
 	aries.protocolSvcCreators = append(aries.protocolSvcCreators,
 		newMessagePickupSvc())
 
@@ -79,14 +89,19 @@ func defFrameworkOpts(aries *Aries) error {
 		}
 	}
 
+	// 设置其他选项
 	return setAdditionalDefaultOpts(aries)
 }
 
-func createDefSecretLock(aries *Aries) error {
-	aries.secretLock = &noop.NoLock{}
-	return nil
-}
-
+// setAdditionalDefaultOpts 设置其他选项
+// 包括：
+//
+//	1）KMS + Crypto
+//	2）Key Type
+//	3）Key Agreement Type
+//	4）Packer Creator
+//	5）Packager Creator
+//	6）Protocol State Store Provider
 func setAdditionalDefaultOpts(aries *Aries) error {
 	err := setDefaultKMSCryptoOpts(aries)
 	if err != nil {

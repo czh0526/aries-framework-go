@@ -18,16 +18,20 @@ type DocumentLoader struct {
 }
 
 func (d *DocumentLoader) LoadDocument(u string) (*jsonld.RemoteDocument, error) {
+	// 本地查找
 	rd, err := d.store.Get(u)
 	if err != nil {
+		// 查询出错
 		if !errors.Is(err, spistorage.ErrDataNotFound) {
 			return nil, fmt.Errorf("load document: %w", err)
 		}
 
+		// 不支持远程查找
 		if d.remoteDocumentLoader == nil {
 			return nil, ErrContextNotFound
 		}
 
+		// 远程查找
 		return d.loadDocumentFromURL(u)
 	}
 
@@ -35,11 +39,13 @@ func (d *DocumentLoader) LoadDocument(u string) (*jsonld.RemoteDocument, error) 
 }
 
 func (d *DocumentLoader) loadDocumentFromURL(u string) (*jsonld.RemoteDocument, error) {
+	// 远程查找
 	rd, err := d.remoteDocumentLoader.LoadDocument(u)
 	if err != nil {
 		return nil, fmt.Errorf("load remote context document: %w", err)
 	}
 
+	// 存入本地
 	if err = d.store.Put(u, rd); err != nil {
 		return nil, fmt.Errorf("save loaded document: %w", err)
 	}

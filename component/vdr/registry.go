@@ -19,6 +19,8 @@ type Registry struct {
 	defServiceType     string
 }
 
+var _ vdrapi.Registry = (*Registry)(nil)
+
 type Option func(registry *Registry)
 
 func New(opts ...Option) *Registry {
@@ -31,8 +33,6 @@ func New(opts ...Option) *Registry {
 
 	return baseVDR
 }
-
-var _ vdrapi.Registry = (*Registry)(nil)
 
 func WithVDR(method vdrapi.VDR) Option {
 	return func(registry *Registry) {

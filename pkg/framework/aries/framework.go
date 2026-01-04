@@ -3,12 +3,13 @@ package aries
 import (
 	"fmt"
 	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
+	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
 	"github.com/czh0526/aries-framework-go/component/models/ld/documentloader"
 	ldstore "github.com/czh0526/aries-framework-go/component/models/ld/store"
 	"github.com/czh0526/aries-framework-go/component/vdr"
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
-	"github.com/czh0526/aries-framework-go/component/vdr/key"
-	"github.com/czh0526/aries-framework-go/component/vdr/peer"
+	vdrkey "github.com/czh0526/aries-framework-go/component/vdr/key"
+	vdrpeer "github.com/czh0526/aries-framework-go/component/vdr/peer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/inbound"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/outbound"
@@ -28,7 +29,7 @@ import (
 
 const (
 	defaultEndpoint     = "didcomm:transport/queue"
-	defaultMasterKeyURI = "local-lock://default/master/key/"
+	defaultMasterKeyURI = "local-lock://default/master/vdrkey/"
 )
 
 type Aries struct {
@@ -82,8 +83,7 @@ func New(opts ...Option) (*Aries, error) {
 	// 设置 id
 	aries.id = uuid.New().String()
 
-	// 设置 store provider, 各种 store，
-	// crypto, kmsCreator, packer, packager
+	// 设置 aries 的默认选项
 	err := defFrameworkOpts(aries)
 	if err != nil {
 		return nil, fmt.Errorf("default option initialization failed: %w", err)
@@ -129,6 +129,13 @@ func (a *Aries) closeVDR() error {
 	return nil
 }
 
+// initializeServices 根据前期设置的 Service Creator 函数集初始化服务
+// 包括：
+//  1. KMS
+//  2. VDR
+//  3. Packer & Packager
+//  4. OutboundDispatcher
+//  5. Services
 func initializeServices(aries *Aries) (*Aries, error) {
 	// 创建 KMS
 	if err := createKMS(aries); err != nil {
@@ -262,18 +269,26 @@ func WithVDR(v vdrapi.VDR) Option {
 	}
 }
 
+func createDefSecretLock(aries *Aries) error {
+	aries.secretLock = &noop.NoLock{}
+	return nil
+}
+
 func createKMS(aries *Aries) error {
+	// 构建 KMS Store => 数据库名: kmsdb
 	ariesProviderKMSStoreWrapper, err := kms.NewAriesProviderWrapper(aries.storeProvider)
 	if err != nil {
 		return fmt.Errorf("create Aries provider KMS store wrapper failed: %w", err)
 	}
 
-	kmsProv := &kmsProvider{
+	// 构建 KMS Provider
+	provider := &kmsProvider{
 		kmsStore:          ariesProviderKMSStoreWrapper,
 		secretLockService: aries.secretLock,
 	}
 
-	aries.kms, err = aries.kmsCreator(kmsProv)
+	// 构建 KMS (local | web)
+	aries.kms, err = aries.kmsCreator(provider)
 	if err != nil {
 		return fmt.Errorf("create KMS failed: %w", err)
 	}
@@ -297,10 +312,10 @@ func createVDR(aries *Aries) error {
 		vdrOpts = append(vdrOpts, vdr.WithVDR(v))
 	}
 
-	// 将 did:peer:xxxxx 注册进 VDRegistry
-	p, err := peer.New(ctx.StorageProvider())
+	// 将 did:vdrpeer:xxxxx 注册进 VDRegistry
+	p, err := vdrpeer.New(ctx.StorageProvider())
 	if err != nil {
-		return fmt.Errorf("create new vdr peer failed: %w", err)
+		return fmt.Errorf("create new vdr vdrpeer failed: %w", err)
 	}
 
 	dst := vdrapi.DIDCommServiceType
@@ -318,8 +333,8 @@ func createVDR(aries *Aries) error {
 		vdr.WithDefaultServiceEndpoint(serviceEndpoint(aries)),
 	)
 
-	// 将 did:key:xxxxx 注册进 VDRegistry
-	k := key.New()
+	// 将 did:vdrkey:xxxxx 注册进 VDRegistry
+	k := vdrkey.New()
 	vdrOpts = append(vdrOpts, vdr.WithVDR(k))
 	aries.vdrRegistry = vdr.New(vdrOpts...)
 
@@ -331,12 +346,12 @@ func createJSONLDContextStore(aries *Aries) error {
 		return nil
 	}
 
-	s, err := ldstore.NewContextStore(aries.storeProvider)
+	ldStore, err := ldstore.NewContextStore(aries.storeProvider)
 	if err != nil {
 		return fmt.Errorf("init JSON-LD remote context store failed, err = %w", err)
 	}
 
-	aries.contextStore = s
+	aries.contextStore = ldStore
 	return nil
 }
 
@@ -345,12 +360,12 @@ func createJSONLDRemoteProviderStore(aries *Aries) error {
 		return nil
 	}
 
-	s, err := ldstore.NewRemoteProviderStore(aries.storeProvider)
+	remoteProviderStore, err := ldstore.NewRemoteProviderStore(aries.storeProvider)
 	if err != nil {
 		return fmt.Errorf("init JSON-LD remote provider store failed, err = %w", err)
 	}
 
-	aries.remoteProviderStore = s
+	aries.remoteProviderStore = remoteProviderStore
 	return nil
 }
 
