@@ -7,6 +7,7 @@ require (
 	github.com/btcsuite/btcd v0.22.3
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789
+	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20260104105808-af7c0737a311
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/golang/mock v1.6.0
@@ -22,6 +23,7 @@ require (
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.9.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/hyperledger/fabric-amcl v0.0.0-20210603140002-2670f91851c8 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
@@ -32,6 +34,6 @@ require (
 )
 
 replace (
-	"github.com/czh0526/aries-framework-go/spi" => "../../spi"
-	"github.com/czh0526/aries-framework-go/component/log" => "../log"
+	github.com/czh0526/aries-framework-go/component/log => ../log
+	github.com/czh0526/aries-framework-go/spi => ../../spi
 )

@@ -19,11 +19,8 @@ github.com/consensys/bavard v0.1.13 h1:oLhMLOFGTLdlda/kma4VOJazblc7IM5y5QPd2A/Yj
 github.com/consensys/bavard v0.1.13/go.mod h1:9ItSMtA/dXMAiL7BG6bqW2m3NdSEObYWoH223nGHukI=
 github.com/consensys/gnark-crypto v0.9.1 h1:mru55qKdWl3E035hAoh1jj9d7hVnYY5pfb6tmovSmII=
 github.com/consensys/gnark-crypto v0.9.1/go.mod h1:a2DQL4+5ywF6safEeZFEPGRiiGbjzGFRUN2sg06VuU4=
-github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789 h1:ipTJbK7ohvX1B5J8bSZ7659tlH7Z5BW2ezG8zILpUzI=
-github.com/czh0526/aries-framework-go/component/log v0.0.0-20250704014650-3af35ecb5789/go.mod h1:2YjcrX4BqVSy3Sq92jd93SlQWh6c8tEJp1uVuItwGdg=
-github.com/czh0526/aries-framework-go/spi v0.0.0-20250702110920-72cb70592d42/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=
-github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a h1:1vLSfbZZ2sjubj7e23sGhDFmIbNfE5ztwCJh5laNmDE=
-github.com/czh0526/aries-framework-go/spi v0.0.0-20251123150327-e865d0a2866a/go.mod h1:/qIktSDoD8KblfhdU9I4ai4HelmU4m5b6pa77CAcTMg=
+github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20260104105808-af7c0737a311 h1:3XOgGTWXVAMOowic+0fcQyj1vx548x7+g/TxJtPcl7U=
+github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20260104105808-af7c0737a311/go.mod h1:nhusnqmqRhnWmwNZJ2kOMGbXrbmL9ZyNFiX4fUyP6/8=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -31,6 +28,8 @@ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-jose/go-jose/v3 v3.0.4 h1:Wp5HA7bLQcKnf6YYao/4kpRpVMp/yf6+pJKV8WFSaNY=
 github.com/go-jose/go-jose/v3 v3.0.4/go.mod h1:5b+7YgP7ZICgJDBdfjZaIt+H/9L9T/YQrVfLAMboGkQ=
+github.com/go-sql-driver/mysql v1.5.0 h1:ozyZYNQW3x3HtqT1jira07DN2PArx2v7/mN66gGcHOs=
+github.com/go-sql-driver/mysql v1.5.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LBy8hT2VhHyBg=
 github.com/golang/mock v1.6.0 h1:ErTB+efbowRARo13NNdxyJji2egdxLGQhRaY+DUumQc=
 github.com/golang/mock v1.6.0/go.mod h1:p6yTPP+5HYm5mzsMV8JkE6ZKdX+/wYM6Hr+LicevLPs=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=

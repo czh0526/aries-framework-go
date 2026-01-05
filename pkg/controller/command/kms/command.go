@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
+	josejwk "github.com/czh0526/aries-framework-go/component/kmscrypto/doc/jose/jwk"
 	"github.com/czh0526/aries-framework-go/component/log"
 	"github.com/czh0526/aries-framework-go/pkg/controller/command"
 	"github.com/czh0526/aries-framework-go/pkg/controller/internal/cmdutil"
@@ -51,6 +51,13 @@ func New(ctx provider) *Command {
 	}
 }
 
+func (c *Command) GetHandlers() []command.Handler {
+	return []command.Handler{
+		cmdutil.NewCommandHandler(CommandName, CreateKeySetCommandMethod, c.CreateKeySet),
+		cmdutil.NewCommandHandler(CommandName, ImportKeyCommandMethod, c.ImportKey),
+	}
+}
+
 func (c *Command) CreateKeySet(rw io.Writer, req io.Reader) command.Error {
 	var request CreateKeySetRequest
 
@@ -89,7 +96,7 @@ func (c *Command) ImportKey(rw io.Writer, req io.Reader) command.Error {
 		return command.NewValidationError(InvalidRequestErrorCode, fmt.Errorf("failed request decode: %w", err))
 	}
 
-	var j jwk.JWK
+	var j josejwk.JWK
 	if errUnmarshal := json.Unmarshal(buf.Bytes(), &j); errUnmarshal != nil {
 		logutil.LogError(logger, CommandName, ImportKeyCommandMethod, errUnmarshal.Error())
 		return command.NewValidationError(InvalidRequestErrorCode, fmt.Errorf("failed request decode: %w", errUnmarshal))
@@ -127,11 +134,4 @@ func (c *Command) ImportKey(rw io.Writer, req io.Reader) command.Error {
 
 	logutil.LogDebug(logger, CommandName, ImportKeyCommandMethod, "success")
 	return nil
-}
-
-func (c *Command) GetHandlers() []command.Handler {
-	return []command.Handler{
-		cmdutil.NewCommandHandler(CommandName, CreateKeySetCommandMethod, c.CreateKeySet),
-		cmdutil.NewCommandHandler(CommandName, ImportKeyCommandMethod, c.ImportKey),
-	}
 }

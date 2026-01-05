@@ -7,7 +7,7 @@ require (
 	github.com/czh0526/aries-framework-go/component/log v0.0.0-20251210110246-7d4f53f9c64c
 	github.com/czh0526/aries-framework-go/component/models v0.0.0-20251224110511-bca6c87cc380
 	github.com/czh0526/aries-framework-go/component/storage v0.0.0-20251123145407-d92bd878ebfd
-	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20251123160010-333d7ea42976
+	github.com/czh0526/aries-framework-go/component/storage/mysql v0.0.0-20260104105808-af7c0737a311
 	github.com/czh0526/aries-framework-go/component/storageutil v0.0.0-20251208043106-351c7e6daee0
 	github.com/czh0526/aries-framework-go/component/vdr v0.0.0-20251206042806-4eaf6ce264e2
 	github.com/czh0526/aries-framework-go/spi v0.0.0-20251123160010-333d7ea42976
