@@ -41,6 +41,33 @@ type MessageHandler struct {
 	initialized            bool
 }
 
+type provider interface {
+	DIDConnectionStore() didstore.ConnectionStore
+}
+
+func NewInboundMessageHandler(p provider) *MessageHandler {
+	h := MessageHandler{}
+	h.Initialize(p)
+
+	return &h
+}
+
+func (mh *MessageHandler) Initialize(p provider) {
+	if mh.initialized {
+		return
+	}
+
+	mh.didConnectionStore = p.DIDConnectionStore()
+
+	mh.initialized = true
+}
+
+func (mh *MessageHandler) HandlerFunc() transport.InboundMessageHandler {
+	return func(envelope *transport.Envelope) error {
+		return mh.HandleInboundEnvelope(envelope)
+	}
+}
+
 func (mh *MessageHandler) HandleInboundEnvelope(envelope *transport.Envelope) error {
 	var (
 		msg service.DIDCommMsgMap
@@ -146,12 +173,6 @@ func (mh *MessageHandler) HandleInboundEnvelope(envelope *transport.Envelope) er
 	}
 
 	return fmt.Errorf("no message handlers found for the message type: %s", msg.Type())
-}
-
-func (mh *MessageHandler) HandlerFunc() transport.InboundMessageHandler {
-	return func(envelope *transport.Envelope) error {
-		return mh.HandleInboundEnvelope(envelope)
-	}
 }
 
 func (mh *MessageHandler) tryToHandle(
@@ -266,18 +287,4 @@ func pubKeyToDID(kwy []byte) (string, error) {
 	}
 
 	return toKey.KID[:strings.Index(toKey.KID, kaIdentifier)], nil
-}
-
-func (mh *MessageHandler) Initialize(p provider) {
-	return
-}
-
-type provider interface {
-}
-
-func NewInboundMessageHandler(p provider) *MessageHandler {
-	h := MessageHandler{}
-	h.Initialize(p)
-
-	return &h
 }

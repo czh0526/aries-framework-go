@@ -18,6 +18,7 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	"github.com/czh0526/aries-framework-go/pkg/framework/aries/api"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
+	didstore "github.com/czh0526/aries-framework-go/pkg/store/did"
 	verifiablestore "github.com/czh0526/aries-framework-go/pkg/store/verifiable"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -39,6 +40,7 @@ type Aries struct {
 	protocolStateStoreProvider spistorage.Provider
 	contextStore               ldstore.ContextStore
 	remoteProviderStore        ldstore.RemoteProviderStore
+	didConnectionStore         didstore.ConnectionStore
 	// crypto + kms
 	crypto           spicrypto.Crypto
 	kmsCreator       spikms.Creator
@@ -47,12 +49,16 @@ type Aries struct {
 	keyType          spikms.KeyType
 	keyAgreementType spikms.KeyType
 	// vdr
-	vdr               []vdrapi.VDR
-	vdrRegistry       vdrapi.Registry
-	verifiableStore   verifiablestore.Store
-	documentLoader    jsonld.DocumentLoader
-	packerCreator     packer.Creator
-	packerCreators    []packer.Creator
+	vdr             []vdrapi.VDR
+	vdrRegistry     vdrapi.Registry
+	verifiableStore verifiablestore.Store
+	documentLoader  jsonld.DocumentLoader
+	// packer
+	packerCreator  packer.Creator
+	packerCreators []packer.Creator
+	primaryPacker  packer.Packer
+	packers        []packer.Packer
+	// packager
 	packagerCreator   packager.Creator
 	packager          transport.Packager
 	mediaTypeProfiles []string
@@ -149,6 +155,11 @@ func initializeServices(aries *Aries) (*Aries, error) {
 
 	// 创建 Packer & Packager
 	if err := createPackersAndPackager(aries); err != nil {
+		return nil, err
+	}
+
+	// 创建 DID Connection Store
+	if err := createDIDConnectionStore(aries); err != nil {
 		return nil, err
 	}
 
@@ -312,7 +323,7 @@ func createVDR(aries *Aries) error {
 		vdrOpts = append(vdrOpts, vdr.WithVDR(v))
 	}
 
-	// 将 did:vdrpeer:xxxxx 注册进 VDRegistry
+	// 将 didstore:vdrpeer:xxxxx 注册进 VDRegistry
 	p, err := vdrpeer.New(ctx.StorageProvider())
 	if err != nil {
 		return fmt.Errorf("create new vdr vdrpeer failed: %w", err)
@@ -333,7 +344,7 @@ func createVDR(aries *Aries) error {
 		vdr.WithDefaultServiceEndpoint(serviceEndpoint(aries)),
 	)
 
-	// 将 did:vdrkey:xxxxx 注册进 VDRegistry
+	// 将 didstore:vdrkey:xxxxx 注册进 VDRegistry
 	k := vdrkey.New()
 	vdrOpts = append(vdrOpts, vdr.WithVDR(k))
 	aries.vdrRegistry = vdr.New(vdrOpts...)
@@ -400,6 +411,62 @@ func fetchEndpoint(aries *Aries, defaultScheme string) string {
 }
 
 func createPackersAndPackager(aries *Aries) error {
+	packerCtx, err := context.New(
+		context.WithCrypto(aries.crypto),
+		context.WithStorageProvider(aries.storeProvider),
+		context.WithKMS(aries.kms),
+		context.WithVDRegistry(aries.vdrRegistry))
+	if err != nil {
+		return fmt.Errorf("create packer context failed: %w", err)
+	}
+
+	aries.primaryPacker, err = aries.packerCreator(packerCtx)
+	if err != nil {
+		return fmt.Errorf("create packer failed: %w", err)
+	}
+
+	for _, pc := range aries.packerCreators {
+		if pc == nil {
+			continue
+		}
+
+		packerInstance, e := pc(packerCtx)
+		if e != nil {
+			return fmt.Errorf("create packer failed: %w", e)
+		}
+
+		aries.packers = append(aries.packers, packerInstance)
+	}
+
+	packagerCtx, err := context.New(
+		context.WithPacker(aries.primaryPacker, aries.packers...),
+		context.WithStorageProvider(aries.storeProvider),
+		context.WithVDRegistry(aries.vdrRegistry))
+	if err != nil {
+		return fmt.Errorf("create packager context failed: %w", err)
+	}
+
+	aries.packager, err = aries.packagerCreator(packagerCtx)
+	if err != nil {
+		return fmt.Errorf("create packager failed: %w", err)
+	}
+
+	return nil
+}
+
+func createDIDConnectionStore(aries *Aries) error {
+	if aries.didConnectionStore != nil {
+		return nil
+	}
+
+	ctx, err := context.New(
+		context.WithStorageProvider(aries.storeProvider),
+		context.WithVDRegistry(aries.vdrRegistry))
+	if err != nil {
+		return fmt.Errorf("context creation failed: %w", err)
+	}
+
+	aries.didConnectionStore, err = didstore.NewConnectionStore(ctx)
 	return nil
 }
 
@@ -440,6 +507,10 @@ func loadServices(aries *Aries) error {
 		context.WithProtocolStateStorageProvider(aries.protocolStateStoreProvider),
 		context.WithInboundEnvelopeHandler(&aries.inboundEnvelopeHandler),
 		context.WithOutboundDispatcher(aries.outboundDispatcher),
+		context.WithKMS(aries.kms),
+		context.WithCrypto(aries.crypto),
+		context.WithPackager(aries.packager),
+		context.WithDIDConnectionStore(aries.didConnectionStore),
 	)
 	if err != nil {
 		return fmt.Errorf("create context failed: %w", err)

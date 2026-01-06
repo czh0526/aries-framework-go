@@ -36,8 +36,10 @@ func (s Service) HandleOutbound(msg service.DIDCommMsg, myDID, theirDID string) 
 }
 
 func (s Service) Accept(msgType string) bool {
-	//TODO implement me
-	panic("implement me")
+	return msgType == InvitationMsgType ||
+		msgType == RequestMsgType ||
+		msgType == ResponseMsgType ||
+		msgType == AckMsgType
 }
 
 func (s Service) Name() string {

@@ -8,9 +8,10 @@ import (
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/inbound"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/packer"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
 	"github.com/czh0526/aries-framework-go/pkg/framework/aries/api"
-	"github.com/czh0526/aries-framework-go/pkg/store/did"
+	didstore "github.com/czh0526/aries-framework-go/pkg/store/did"
 	"github.com/czh0526/aries-framework-go/pkg/store/verifiable"
 	spicrypto "github.com/czh0526/aries-framework-go/spi/crypto"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -20,7 +21,6 @@ import (
 )
 
 type InboundEnvelopeHandler interface {
-	HandleInboundEnvelope(envelope *transport.Envelope) error
 	HandlerFunc() transport.InboundMessageHandler
 }
 
@@ -37,7 +37,8 @@ type Context struct {
 	protocolStateStoreProvider spistorage.Provider
 	contextStore               ldstore.ContextStore
 	verifiableStore            verifiable.Store
-	didConnectionStore         did.ConnectionStore
+	didConnection              didstore.ConnectionStore
+	didConnectionStore         didstore.ConnectionStore
 	remoteProviderStore        ldstore.RemoteProviderStore
 	documentLoader             jsonld.DocumentLoader
 	serviceEndpoint            string
@@ -45,12 +46,22 @@ type Context struct {
 	vdr                        vdrapi.Registry
 	frameworkID                string
 	packager                   transport.Packager
+	primaryPacker              packer.Packer
+	packers                    []packer.Packer
 	outboundDispatcher         dispatcher.Outbound
 	outboundTransports         []transport.OutboundTransport
 	inboundEnvelopeHandler     InboundEnvelopeHandler
 	messenger                  service.Messenger
 	mediaTypeProfiles          []string
 	didRotator                 *middleware.DIDCommMessageMiddleware
+}
+
+func (c *Context) Packers() []packer.Packer {
+	return c.packers
+}
+
+func (c *Context) PrimaryPacker() packer.Packer {
+	return c.primaryPacker
 }
 
 func (c *Context) JSONLDDocumentLoader() jsonld.DocumentLoader {
@@ -112,7 +123,7 @@ func (c *Context) VerifiableStore() verifiable.Store {
 	return c.verifiableStore
 }
 
-func (c *Context) DIDConnectionStore() did.ConnectionStore {
+func (c *Context) DIDConnectionStore() didstore.ConnectionStore {
 	return c.didConnectionStore
 }
 
@@ -235,6 +246,14 @@ func WithCrypto(c spicrypto.Crypto) ContextOption {
 	}
 }
 
+func WithPacker(primary packer.Packer, additionalPackers ...packer.Packer) ContextOption {
+	return func(p *Context) error {
+		p.primaryPacker = primary
+		p.packers = append(p.packers, additionalPackers...)
+		return nil
+	}
+}
+
 func WithOutboundTransports(transports ...transport.OutboundTransport) ContextOption {
 	return func(opts *Context) error {
 		opts.outboundTransports = transports
@@ -245,6 +264,13 @@ func WithOutboundTransports(transports ...transport.OutboundTransport) ContextOp
 func WithPackager(packager transport.Packager) ContextOption {
 	return func(opts *Context) error {
 		opts.packager = packager
+		return nil
+	}
+}
+
+func WithDIDConnectionStore(store didstore.ConnectionStore) ContextOption {
+	return func(p *Context) error {
+		p.didConnectionStore = store
 		return nil
 	}
 }

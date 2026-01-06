@@ -46,7 +46,7 @@ func newLocalKMS(t *testing.T) *localkms.LocalKMS {
 	return localKms
 }
 
-func TestPack(t *testing.T) {
+func TestPackEnvelope(t *testing.T) {
 	localKms := newLocalKMS(t)
 
 	recKey, _, err := localKms.ExportPubKeyBytes("XnA20h63eW72hIgET2TmrIt0WZ4YnZTObZTqNu0cmJ4")
@@ -55,9 +55,12 @@ func TestPack(t *testing.T) {
 	t.Run("Success: pack then unpack, same packer", func(t *testing.T) {
 		packer := newWithKMSAndCrypto(t, localKms)
 		msgIn := []byte(`{
-"@id":"61bd7e15-27c3-43b0-8941-2b4519746405",
-"@type":"https://didcomm.org/introduce/1.0/proposal",
-"to":{"name":"Carol"}}`)
+  "@type": "https://didcomm.org/didexchange/1.0/request",
+  "@id": "请求的UUID",
+  "~thread": { "thid": "邀请的UUID" },
+  "label": "Bob's Phone",
+  "did": "did:peer:1zQmZir48ihcLB2aWa2SNQWYSRcEDs2Fr1vhzkM5jF4NCiT7" 
+}`)
 
 		var (
 			enc []byte
