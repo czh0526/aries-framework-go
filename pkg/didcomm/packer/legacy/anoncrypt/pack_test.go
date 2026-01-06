@@ -28,7 +28,7 @@ func (p *testProvider) SecretLock() spisecretlock.Service {
 
 func newLocalKMS(t *testing.T) *localkms.LocalKMS {
 
-	dbProvider, err := mysql.NewProvider("root:123456@tcp(127.0.0.1:3306)/aries?charset=utf8mb4&parseTime=True&loc=Local")
+	dbProvider, err := mysql.NewProvider("root:123456@tcp(127.0.0.1:3306)/aries_rest?charset=utf8mb4&parseTime=True&loc=Local")
 	require.NoError(t, err)
 
 	dbStore, err := kms.NewAriesProviderWrapper(dbProvider)
@@ -46,20 +46,20 @@ func newLocalKMS(t *testing.T) *localkms.LocalKMS {
 	return localKms
 }
 
-func TestPackEnvelope(t *testing.T) {
+func TestPack(t *testing.T) {
 	localKms := newLocalKMS(t)
 
-	recKey, _, err := localKms.ExportPubKeyBytes("XnA20h63eW72hIgET2TmrIt0WZ4YnZTObZTqNu0cmJ4")
+	alicePubKey, _, err := localKms.ExportPubKeyBytes("0HDTiqT1MePbonhntSl12_GzGYcO9olDjr2cUJeDT20")
 	require.NoError(t, err)
 
 	t.Run("Success: pack then unpack, same packer", func(t *testing.T) {
 		packer := newWithKMSAndCrypto(t, localKms)
-		msgIn := []byte(`{
-  "@type": "https://didcomm.org/didexchange/1.0/request",
-  "@id": "请求的UUID",
-  "~thread": { "thid": "邀请的UUID" },
-  "label": "Bob's Phone",
-  "did": "did:peer:1zQmZir48ihcLB2aWa2SNQWYSRcEDs2Fr1vhzkM5jF4NCiT7" 
+		aliceProposalToCarol := []byte(`{
+	"@id":"61bd7e15-27c3-43b0-8941-2b4519746405",
+	"@type":"https://didcomm.org/introduce/1.0/proposal",
+	"to":{
+		"name":"Carol"
+	}
 }`)
 
 		var (
@@ -67,11 +67,11 @@ func TestPackEnvelope(t *testing.T) {
 			env *transport.Envelope
 		)
 
-		enc, err = packer.Pack("", msgIn, nil, [][]byte{recKey})
+		enc, err = packer.Pack("", aliceProposalToCarol, nil, [][]byte{alicePubKey})
 		require.NoError(t, err)
 		fmt.Printf("envelope ==> %s\n", enc)
 		env, err = packer.Unpack(enc)
 		require.NoError(t, err)
-		fmt.Sprintf("%#v\n", env)
+		fmt.Printf("%#v\n", env)
 	})
 }
