@@ -7,7 +7,7 @@ import (
 	vdrapi "github.com/czh0526/aries-framework-go/component/vdr/api"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher"
-	messagepickup "github.com/czh0526/aries-framework-go/pkg/didcomm/protocol/mssagepickup"
+	msgpickupprotocol "github.com/czh0526/aries-framework-go/pkg/didcomm/protocol/messagepickup"
 	connstore "github.com/czh0526/aries-framework-go/pkg/store/connection"
 	medprotocol "github.com/czh0526/aries-framework-go/provider/didcomm/protocol/mediator"
 	spikms "github.com/czh0526/aries-framework-go/spi/kms"
@@ -52,6 +52,12 @@ type callback struct {
 	err      error
 }
 
+type connections interface {
+	GetConnectionIDByDIDs(string, string) (string, error)
+	GetConnectionRecord(string) (*connstore.Record, error)
+	GetConnectionRecordByDIDs(myDID string, theirDID string) (*connstore.Record, error)
+}
+
 type Service struct {
 	service.Action
 	service.Message
@@ -64,7 +70,7 @@ type Service struct {
 	keylistUpdateMap     map[string]chan *KeylistUpdateResponse
 	keylistUpdateMapLock sync.RWMutex
 	callbacks            chan *callback
-	messagePickupSvc     messagepickup.ProtocolService
+	messagePickupSvc     msgpickupprotocol.ProtocolService
 	keyAgreementType     spikms.KeyType
 	mediaTypeProfiles    []string
 	initialized          bool
@@ -109,12 +115,12 @@ func (s *Service) Initialized(p interface{}) error {
 		return err
 	}
 
-	mp, err := prov.Service(messagepickup.MessagePickup)
+	mp, err := prov.Service(msgpickupprotocol.MessagePickup)
 	if err != nil {
 		return err
 	}
 
-	messagePickupSvc, ok := mp.(messagepickup.ProtocolService)
+	messagePickupSvc, ok := mp.(msgpickupprotocol.ProtocolService)
 	if !ok {
 		return errors.New("cast service to message pickup service failed")
 	}
@@ -188,10 +194,4 @@ func ConnectionByVersion(v service.Version) ConnectionOption {
 	return func(opts *getConnectionOpts) {
 		opts.version = v
 	}
-}
-
-type connections interface {
-	GetConnectionIDByDIDs(string, string) (string, error)
-	GetConnectionRecord(string) (*connstore.Record, error)
-	GetConnectionRecordByDIDs(myDID string, theirDID string) (*connstore.Record, error)
 }

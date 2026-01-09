@@ -64,7 +64,7 @@ func (s *Service) Initialize(p interface{}) error {
 
 	prov, ok := p.(provider)
 	if !ok {
-		return fmt.Errorf("exoected provider of type `%T`, got type `%T`", provider(nil), p)
+		return fmt.Errorf("expected provider of type `%T`, got type `%T`", provider(nil), p)
 	}
 
 	store, err := prov.StorageProvider().OpenStore(Namespace)

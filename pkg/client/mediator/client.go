@@ -2,6 +2,7 @@ package mediator
 
 import (
 	"errors"
+	"fmt"
 	didcommsvc "github.com/czh0526/aries-framework-go/pkg/didcomm/common/service"
 	medprotocol "github.com/czh0526/aries-framework-go/pkg/didcomm/protocol/mediator"
 	medprovider "github.com/czh0526/aries-framework-go/provider/mediator"
@@ -48,4 +49,12 @@ func New(ctx medprovider.Provider, options ...medprotocol.ClientOption) (*Client
 		routeSvc: routeSvc,
 		options:  options,
 	}, nil
+}
+
+func (c *Client) Register(connectionID string) error {
+	if err := c.routeSvc.Register(connectionID, c.options...); err != nil {
+		return fmt.Errorf("router registration: %w", err)
+	}
+
+	return nil
 }
