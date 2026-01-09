@@ -2,64 +2,39 @@ package anoncrypt
 
 import (
 	"fmt"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/kms/localkms"
-	"github.com/czh0526/aries-framework-go/component/kmscrypto/secretlock/noop"
-	"github.com/czh0526/aries-framework-go/component/storage/mysql"
 	"github.com/czh0526/aries-framework-go/pkg/didcomm/transport"
-	spikms "github.com/czh0526/aries-framework-go/spi/kms"
-	spisecretlock "github.com/czh0526/aries-framework-go/spi/secretlock"
+	testkms "github.com/czh0526/aries-framework-go/tests/kms"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-type testProvider struct {
-	storeProvider      spikms.Store
-	secretLockProvider spisecretlock.Service
-}
-
-func (p *testProvider) StorageProvider() spikms.Store {
-	return p.storeProvider
-}
-
-func (p *testProvider) SecretLock() spisecretlock.Service {
-	return p.secretLockProvider
-}
-
-func newLocalKMS(t *testing.T) *localkms.LocalKMS {
-
-	dbProvider, err := mysql.NewProvider("root:123456@tcp(127.0.0.1:3306)/aries_rest?charset=utf8mb4&parseTime=True&loc=Local")
-	require.NoError(t, err)
-
-	dbStore, err := kms.NewAriesProviderWrapper(dbProvider)
-	require.NoError(t, err)
-
-	p := testProvider{
-		storeProvider:      dbStore,
-		secretLockProvider: &noop.NoLock{},
-	}
-
-	mainLockURI := "local-lock://test/uri/"
-	localKms, err := localkms.New(mainLockURI, &p)
-	require.NoError(t, err)
-
-	return localKms
-}
-
 func TestPack(t *testing.T) {
-	localKms := newLocalKMS(t)
+	localKms := testkms.NewLocalKMS(t)
 
-	alicePubKey, _, err := localKms.ExportPubKeyBytes("0HDTiqT1MePbonhntSl12_GzGYcO9olDjr2cUJeDT20")
+	alicePubKey, _, err := localKms.ExportPubKeyBytes("y5XryGshZExvDsdm-WvKTN521T3cOudKX8T358CpTfA")
 	require.NoError(t, err)
 
 	t.Run("Success: pack then unpack, same packer", func(t *testing.T) {
 		packer := newWithKMSAndCrypto(t, localKms)
 		aliceProposalToCarol := []byte(`{
-	"@id":"61bd7e15-27c3-43b0-8941-2b4519746405",
-	"@type":"https://didcomm.org/introduce/1.0/proposal",
-	"to":{
-		"name":"Carol"
-	}
+    "@type": "https://didcomm.org/out-of-band/1.0/invitation",
+    "@id": "邀请的唯一UUID",
+    "label": "Alice's Agent",
+    "goal_code": "issue-vc",
+    "goal": "To issue a digital driver's license",
+    "services": [
+        {
+            "id": "#inline-0",
+            "type": "did-communication",
+            "recipientKeys": [
+                "did:key:z6MkpTHR..."
+            ],
+            "serviceEndpoint": "https://agent.example.com"
+        }
+    ],
+    "handshake_protocols": [
+        "https://didcomm.org/didexchange/1.0"
+    ]
 }`)
 
 		var (

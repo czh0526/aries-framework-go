@@ -6,6 +6,7 @@ import (
 	kmsrest "github.com/czh0526/aries-framework-go/pkg/controller/rest/kms"
 	vdrrest "github.com/czh0526/aries-framework-go/pkg/controller/rest/vdr"
 	verifiablerest "github.com/czh0526/aries-framework-go/pkg/controller/rest/verifiable"
+	"github.com/czh0526/aries-framework-go/pkg/didcomm/dispatcher/outbound"
 	"github.com/czh0526/aries-framework-go/pkg/framework/context"
 	ldsvc "github.com/czh0526/aries-framework-go/pkg/ld"
 	"net/http"
@@ -50,6 +51,11 @@ func GetRestHandlers(ctx *context.Context, opts ...Opt) ([]rest.Handler, error) 
 	veriableOp, err := verifiablerest.New(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create verifiable rest command: %w", err)
+	}
+
+	outboundOp, err := outbound.New(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("create outbound rest command: %w", err)
 	}
 
 	kmsOp := kmsrest.New(ctx)

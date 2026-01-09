@@ -11,3 +11,11 @@ func NewConfig(endpoint string, keys []string) *Config {
 		routingKeys:    keys,
 	}
 }
+
+func (c *Config) Endpoint() string {
+	return c.routerEndpoint
+}
+
+func (c *Config) Keys() []string {
+	return c.routingKeys
+}
